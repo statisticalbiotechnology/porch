@@ -10,6 +10,8 @@ Parser Component
 ----------------
 ```eval_rst
 .. module:: porch
-.. autofunction:: porch()
+```
 
+```eval_rst
+.. autofunction:: porch()
 ```
