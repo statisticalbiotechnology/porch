@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-""" This is a module"""
 import numpy as np
 import pandas as pd
 from numpy.linalg import svd
@@ -7,6 +6,7 @@ from statsmodels.formula.api import ols
 from statsmodels.stats.anova import anova_lm
 
 def load_dataframe(path, url, columns, indexes):
+    """ This is a function"""
     try:
         tf = tarfile.open(path)
     except:
@@ -15,7 +15,7 @@ def load_dataframe(path, url, columns, indexes):
     return tf
 
 def porch(expression_df, phenotype_df, geneset_df, gene_column = "gene", set_column = "pathway", tests = ["Pathway ~ C(Case)"]):
-"""This is a the central routine of porch. It calculates pathway activities from the expression values of analytes,
+    """This is a the central routine of porch. It calculates pathway activities from the expression values of analytes,
      with a grouping given by a pathway definition. If so specified, it tests the pathway activities with a set of user
      specied tests
      : param expression_df : The DataFrame of the expression values we analyse. These values are logtransformed and subsequently standardized befor analysis
@@ -24,7 +24,7 @@ def porch(expression_df, phenotype_df, geneset_df, gene_column = "gene", set_col
      : param gene_column : The name of the column within geneset_df containing names of analytes.
      : param set_column : The name of the column within geneset_df containing names of pathways.
      : param tests : List of specification of tests that should be performed.
-"""
+     """
     phenotypes = phenotype_df.columns
     phenotypes_bool = geneset.columns in phenotypes
     evaluation_df = phenotype_df.copy()
@@ -52,4 +52,5 @@ def porch(expression_df, phenotype_df, geneset_df, gene_column = "gene", set_col
     return results_df,evaluation_df
 
 def porch_reactome(expression_df, phenotype_df, tests = ["Pathway ~ C(Case)"]):
+    """ This is a function"""
     pass
