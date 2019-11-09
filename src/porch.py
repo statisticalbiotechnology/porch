@@ -6,7 +6,7 @@ from statsmodels.formula.api import ols
 from statsmodels.stats.anova import anova_lm
 
 def load_dataframe(path, url, columns, indexes):
-    """ This is a function"""
+    "This is a function"
     try:
         tf = tarfile.open(path)
     except:
@@ -15,20 +15,24 @@ def load_dataframe(path, url, columns, indexes):
     return tf
 
 def porch(expression_df, phenotype_df, geneset_df, gene_column = "gene", set_column = "pathway", tests = ["Pathway ~ C(Case)"]):
-    """This is a the central routine of porch. It calculates pathway activities from the expression values of analytes,
-     with a grouping given by a pathway definition. If so specified, it tests the pathway activities with a set of user
-     specied tests
-     : param pd.DataFrame expression_df: The DataFrame of the expression values we analyse. These values are logtransformed and subsequently standardized befor analysis
-     : param pd.DataFrame phenotype_df: The DataFrame of the phenotypic variables of each sample, that we want to test against.
-     : param pd.DataFrame geneset_df: The DataFrame of the pathway definitions.
-     : param str gene_column: The name of the column within geneset_df containing names of analytes.
-     : param str set_column: The name of the column within geneset_df containing names of pathways.
-     : param list tests: List of specification of tests that should be performed.
-     :return: A tuple of dataframes with the results, results_df,evaluation_df.
-              results_df, contains the output of the significance tests
-              evaluation_df, contains the pathway activities
-     :rtype: tuple(pd.DataFrame, pd.DataFrame)
-     """
+    """
+    This is a the central routine of porch. It calculates pathway activities from the expression values of analytes,
+    with a grouping given by a pathway definition. If so specified, it tests the pathway activities with a set of user
+    specied tests
+
+    Args:
+        expression_df (pd.DataFrame): The DataFrame of the expression values we analyse. These values are logtransformed and subsequently standardized befor analysis
+        phenotype_df (pd.DataFrame): The DataFrame of the phenotypic variables of each sample, that we want to test against.
+        geneset_df (pd.DataFrame): The DataFrame of the pathway definitions.
+        gene_column (str): The name of the column within geneset_df containing names of analytes.
+        set_column (str): The name of the column within geneset_df containing names of pathways.
+        tests (list): List of specification of tests that should be performed.
+
+    Returns:
+        A tupple of pandas DataFrames results_df, evaluation_df
+        results_df, contains the output of the significance tests
+        evaluation_df, contains the pathway activities
+    """
     phenotypes = phenotype_df.columns
     phenotypes_bool = geneset.columns in phenotypes
     evaluation_df = phenotype_df.copy()
@@ -56,5 +60,5 @@ def porch(expression_df, phenotype_df, geneset_df, gene_column = "gene", set_col
     return results_df,evaluation_df
 
 def porch_reactome(expression_df, phenotype_df, tests = ["Pathway ~ C(Case)"]):
-    """ This is a function"""
+    "This is a function"
     pass
