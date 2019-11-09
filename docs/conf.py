@@ -20,7 +20,7 @@ from recommonmark.transform import AutoStructify
 # -- Project information -----------------------------------------------------
 
 project = 'porch'
-copyright = '2019, Lukas Kall'
+copyright = '2019, Lukas Kall, KTH'
 author = 'Lukas Kall'
 
 

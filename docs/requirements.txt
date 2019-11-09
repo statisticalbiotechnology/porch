@@ -1,0 +1,5 @@
+ipython
+pyyaml
+sphinx>=1.4
+nbsphinx
+recommonmark
