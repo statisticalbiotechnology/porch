@@ -1,9 +1,6 @@
-## Does this work
-Heho.
+# Porch
+This package is intended for individualized pathway analysis.
 
-
-Documentation of the Code
-**************************
 ```eval_rst
 .. toctree::
    :maxdepth: 2

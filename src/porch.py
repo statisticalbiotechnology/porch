@@ -18,12 +18,12 @@ def porch(expression_df, phenotype_df, geneset_df, gene_column = "gene", set_col
     """This is a the central routine of porch. It calculates pathway activities from the expression values of analytes,
      with a grouping given by a pathway definition. If so specified, it tests the pathway activities with a set of user
      specied tests
-     : param expression_df : The DataFrame of the expression values we analyse. These values are logtransformed and subsequently standardized befor analysis
-     : param phenotype_df : The DataFrame of the phenotypic variables of each sample, that we want to test against.
-     : param geneset_df : The DataFrame of the pathway definitions.
-     : param gene_column : The name of the column within geneset_df containing names of analytes.
-     : param set_column : The name of the column within geneset_df containing names of pathways.
-     : param tests : List of specification of tests that should be performed.
+     : param expression_df: The DataFrame of the expression values we analyse. These values are logtransformed and subsequently standardized befor analysis
+     : param phenotype_df: The DataFrame of the phenotypic variables of each sample, that we want to test against.
+     : param geneset_df: The DataFrame of the pathway definitions.
+     : param gene_column: The name of the column within geneset_df containing names of analytes.
+     : param set_column: The name of the column within geneset_df containing names of pathways.
+     : param tests: List of specification of tests that should be performed.
      """
     phenotypes = phenotype_df.columns
     phenotypes_bool = geneset.columns in phenotypes
