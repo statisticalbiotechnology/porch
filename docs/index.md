@@ -10,10 +10,11 @@ Documentation of the Code
    :caption: Contents:
 ```
 
-
+## Porch API
 
 ```eval_rst
-.. module:: porch
+.. automodule:: porch
+   :members:
 ```
 
 ```eval_rst
