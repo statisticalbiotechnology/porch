@@ -14,7 +14,9 @@ def load_dataframe(path, url, columns, indexes):
         tf = tarfile.open(path)
     return tf
 
-def porch(expression_df, phenotype_df, geneset_df, gene_column = "gene", set_column = "pathway", tests = ["Pathway ~ C(Case)"]):
+def porch(expression_df, phenotype_df, geneset_df,
+    gene_column = "gene", set_column = "pathway",
+    tests = ["Pathway ~ C(Case)"]):
     """
     This is a the central routine of porch. It calculates pathway activities from the expression values of analytes,
     with a grouping given by a pathway definition. If so specified, it tests the pathway activities with a set of user

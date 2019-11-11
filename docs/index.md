@@ -1,5 +1,7 @@
 # Porch
-This package is intended for individualized pathway analysis.
+Your method to a individualized pathway analysis scheme.  
+![porch](img/porch.jpg "Photo (c) [Sonja Lovas](https://www.flickr.com/photos/sonjalovas/4038233322)")  
+
 
 ```eval_rst
 .. toctree::
@@ -15,5 +17,6 @@ This package is intended for individualized pathway analysis.
 ```
 
 ```eval_rst
-.. autofunction:: porch()
+.. automodule:: qvalue
+   :members:
 ```
