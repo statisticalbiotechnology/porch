@@ -4,15 +4,9 @@ import pandas as pd
 from numpy.linalg import svd
 from statsmodels.formula.api import ols
 from statsmodels.stats.anova import anova_lm
+import urllib.request
+import os.path
 
-def load_dataframe(path, url, columns, indexes):
-    "This is a function"
-    try:
-        tf = tarfile.open(path)
-    except:
-        track_dl(url, path)
-        tf = tarfile.open(path)
-    return tf
 
 def porch(expression_df, phenotype_df, geneset_df,
     gene_column = "gene", set_column = "pathway",
@@ -61,6 +55,30 @@ def porch(expression_df, phenotype_df, geneset_df,
     results_df = pd.DataFrame(data=results, columns=results_cols,index=setnames)
     return results_df,evaluation_df
 
-def porch_reactome(expression_df, phenotype_df, tests = ["Pathway ~ C(Case)"]):
+def porch_reactome(expression_df, phenotype_df, organism = "HSA", tests = ["Pathway ~ C(Case)"]):
     "This is a function"
-    pass
+    reactome_df = get_reactome_df(organism)
+    return porch(expression_df, phenotype_df, geneset_df,
+        "gene", "reactome_id", tests)
+
+
+def download_file(path, url):
+    "This function downloads a file, path, from an url, if the file does not already exist"
+    if not os.path.isfile(path):
+        stream = urllib.request.urlopen(url)
+        with open(path,'wb') as output:
+            output.write(stream.read())
+    return path
+
+reactome_fn = "Ensembl2Reactome_All_Levels.txt"
+reactome_url = "https://reactome.org/download/current/" + reactome_fn
+
+def get_reactome_df(organism = "HSA"):
+    reactome_df = pd.read_csv(download_file(reactome_fn, reactome_url),
+                        sep='\t',
+                        header=None,
+                        usecols=[0,1,3],
+                        names=["gene","reactome_id","reactome_name"])
+    organism = "R-" + organism
+    reactome_df = reactome_df[organism in reactome_df["reactome_id"] ]
+    return organism_df

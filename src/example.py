@@ -1,6 +1,7 @@
 import pandas as pd
 import tarfile
 import requests
+import os
 import porch
 
 def track_dl(url,tar):
@@ -40,18 +41,31 @@ def get_data(path,url,file):
     try:
         df = pd.read_csv(path, sep="\t")
     except:
-        tf = get_tar(url,"my.tar.gz")
+        tf = get_tar(url,".porch/my.tar.gz")
         tf.extract(file)
         df = pd.read_csv(file, sep="\t")
         df.to_csv(path, sep="\t")
     return df
 
 def tcga_example():
-    brca = get_expression_data("../../data/brca.tsv.gz", 'http://download.cbioportal.org/brca_tcga_pub2015.tar.gz',"data_RNA_Seq_v2_expression_median.txt")
-    brca_clin_raw = get_clinical_data("../../data/brca_clin.tsv.gz", 'http://download.cbioportal.org/brca_tcga_pub2015.tar.gz',"data_clinical_sample.txt")
+    print("Downloading data ...")
+    try:
+        os.mkdir(".porch")
+    except FileExistsError:
+        pass
+    brca = get_expression_data(".porch/brca.tsv.gz", 'http://download.cbioportal.org/brca_tcga_pub2015.tar.gz',"data_RNA_Seq_v2_expression_median.txt")
+    brca_clin_raw = get_clinical_data(".porch/brca_clin.tsv.gz", 'http://download.cbioportal.org/brca_tcga_pub2015.tar.gz',"data_clinical_sample.txt")
+    print("Preprocessing data ...")
     brca.dropna(axis=0, how='any', inplace=True)
     brca = brca.loc[~(brca<=0.0).any(axis=1)]
     brca = pd.DataFrame(data=np.log2(brca),index=brca.index,columns=brca.columns)
     brca_clin = brca_clin_raw[["PR status by ihc","ER Status By IHC","IHC-HER2"],:].rename(index={"PR status by ihc" : "PR","ER Status By IHC":"ER","IHC-HER2":"HER2"})
 
+    print("Run Porch ...")
     results_df,evaluation_df = porch_reactome(brca,brca_clin,["Pathway ~ C(PR)","Pathway ~ C(ER)","Pathway ~ C(HER2)"])
+
+def main():
+    tcga_example()
+
+if __name__ == "__main__":
+    main()
