@@ -4,3 +4,4 @@ recommonmark
 numpy
 pandas
 statsmodels
+mygene

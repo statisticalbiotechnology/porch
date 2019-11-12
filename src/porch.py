@@ -30,14 +30,15 @@ def porch(expression_df, phenotype_df, geneset_df,
         evaluation_df, contains the pathway activities
     """
     phenotypes = phenotype_df.columns
-    phenotypes_bool = geneset.columns in phenotypes
+    phenotypes_bool = [col in phenotypes for col in geneset_df.columns]
     evaluation_df = phenotype_df.copy()
     results_df = pd.DataFrame()
-    for setname, geneset in df.groupby([set_column]):
+    set_df = geneset_df[[gene_column, set_column]]
+    for setname, geneset in set_df.groupby([set_column]):
         genes = list(geneset[gene_column])
         results,setnames = [],[]
         if len(genes)>1:
-            expr = geneset_df.loc[genes,phenotype_bool]
+            expr = geneset_df.loc[genes,phenotypes_bool]
             expr_stand = pd.DataFrame(index=expr.index, columns=expr.columns,data=StandardScaler().fit_transform(np.log(expr.values.T)).T)
             U, S, Vt = svd(expr_stand.values,full_matrices=False)
             eigen_genes = (Vt.T)[:,0]
@@ -58,7 +59,7 @@ def porch(expression_df, phenotype_df, geneset_df,
 def porch_reactome(expression_df, phenotype_df, organism = "HSA", tests = ["Pathway ~ C(Case)"]):
     "This is a function"
     reactome_df = get_reactome_df(organism)
-    return porch(expression_df, phenotype_df, geneset_df,
+    return porch(expression_df, phenotype_df, reactome_df,
         "gene", "reactome_id", tests)
 
 
@@ -70,15 +71,18 @@ def download_file(path, url):
             output.write(stream.read())
     return path
 
-reactome_fn = "Ensembl2Reactome_All_Levels.txt"
+#reactome_fn = "Ensembl2Reactome_All_Levels.txt"
+reactome_fn = "UniProt2Reactome_All_Levels.txt"
+reactome_path = ".porch/" + reactome_fn
 reactome_url = "https://reactome.org/download/current/" + reactome_fn
 
 def get_reactome_df(organism = "HSA"):
-    reactome_df = pd.read_csv(download_file(reactome_fn, reactome_url),
+    reactome_df = pd.read_csv(download_file(reactome_path, reactome_url),
                         sep='\t',
                         header=None,
                         usecols=[0,1,3],
                         names=["gene","reactome_id","reactome_name"])
     organism = "R-" + organism
-    reactome_df = reactome_df[organism in reactome_df["reactome_id"] ]
-    return organism_df
+    print(reactome_df["reactome_id"].str.startswith(organism))
+    reactome_df = reactome_df[reactome_df["reactome_id"].str.startswith(organism) ]
+    return reactome_df
