@@ -71,20 +71,24 @@ def tcga_example():
         os.mkdir(".porch")
     except FileExistsError:
         pass
-    brca = get_expression_data(".porch/brca.tsv.gz", 'http://download.cbioportal.org/brca_tcga_pub2015.tar.gz',"data_RNA_Seq_v2_expression_median.txt")
-    brca_clin_raw = get_clinical_data(".porch/brca_clin.tsv.gz", 'http://download.cbioportal.org/brca_tcga_pub2015.tar.gz',"data_clinical_sample.txt")
-    print("Preprocessing data ...")
-    brca.dropna(axis=0, how='any', inplace=True)
-    brca = brca.loc[~(brca<=0.0).any(axis=1)]
-    print(brca.index)
-    ensembl_ids,drop_list = get_ensembl_ids(list(brca.index))
-    # Convert all genenames we can, drop the rest
-    #brca.rename(index=ensembl)
-    #brca = brca.loc[~df.index.str.startswith('ENSG')]
-    brca.drop(index=drop_list)
-    brca = pd.DataFrame(data=np.log2(brca), index=ensembl_ids, columns=brca.columns)
-    brca_clin = brca_clin_raw.loc[["PR status by ihc","ER Status By IHC","IHC-HER2"]].rename(index={"PR status by ihc" : "PR","ER Status By IHC":"ER","IHC-HER2":"HER2"})
-
+    processed_brca_path = ".porch/proc_brca.tsv.tgz"
+    processed_clin_brca_path = ".porch/proc_clin_brca.tsv.tgz"
+    if os.path.isfile(processed_brca_path) and os.path.isfile(processed_clin_brca_path):
+            brca = pd.read_csv(processed_brca_path, sep="\t")
+            brca_clin = pd.read_csv(processed_clin_brca_path, sep="\t")
+    else:
+            brca = get_expression_data(".porch/brca.tsv.gz", 'http://download.cbioportal.org/brca_tcga_pub2015.tar.gz',"data_RNA_Seq_v2_expression_median.txt")
+            brca_clin_raw = get_clinical_data(".porch/brca_clin.tsv.gz", 'http://download.cbioportal.org/brca_tcga_pub2015.tar.gz',"data_clinical_sample.txt")
+            print("Preprocessing data ...")
+            brca.dropna(axis=0, how='any', inplace=True)
+            brca = brca.loc[~(brca<=0.0).any(axis=1)]
+            ensembl_ids,drop_list = get_ensembl_ids(list(brca.index))
+            # Convert all genenames we can, drop the rest
+            brca.drop(index=drop_list)
+            brca = pd.DataFrame(data=np.log2(brca), index=ensembl_ids, columns=brca.columns)
+            brca_clin = brca_clin_raw.loc[["PR status by ihc","ER Status By IHC","IHC-HER2"]].rename(index={"PR status by ihc" : "PR","ER Status By IHC":"ER","IHC-HER2":"HER2"})
+            brca.to_csv(processed_brca_path, sep="\t")
+            brca_clin.to_csv(processed_clin_brca_path, sep="\t")
     print("Run Porch ...")
     results_df,evaluation_df = porch.porch_reactome(brca,brca_clin,"HSA",["Pathway ~ C(PR)","Pathway ~ C(ER)","Pathway ~ C(HER2)"])
 
