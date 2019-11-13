@@ -1,6 +1,5 @@
 numpy
 pandas
 statsmodels
-tarfile
 requests
 biothings_client
