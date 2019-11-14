@@ -33,17 +33,17 @@ def get_expression_data(path,url,file):
 
 def get_clinical_data(path,url,file):
     df = get_data(path,url,file).T
-    df.columns = df.iloc[2]
-    df.drop(columns=["A unique sample identifier.","STRING","1","SAMPLE_ID",'TCGA-BH-A1ES-01'], inplace=True)
+    df.columns = df.loc["Sample Identifier"]
+    df.drop(columns=["A unique sample identifier.","STRING","1","SAMPLE_ID"], inplace=True,errors='ignore')
     if 'TCGA-BH-A1ES-01' in df.columns:
         df.drop(columns=['TCGA-BH-A1ES-01'], inplace=True)
-    df.drop(index=["Unnamed: 0","#Patient Identifier","Sample Identifier","Other Sample ID"], inplace=True)
+    df.drop(index=["Unnamed: 0","#Patient Identifier","Sample Identifier","Other Sample ID"], inplace=True,errors='ignore')
     df = df.reindex(sorted(df.columns), axis=1)
     return df
 
 def get_data(path,url,file):
     try:
-        df = pd.read_csv(path, sep="\t")
+        df = pd.read_csv(path, sep="\t",index_col=0)
     except:
         tf = get_tar(url,".porch/my.tar.gz")
         tf.extract(file,".porch/")
@@ -54,16 +54,17 @@ def get_data(path,url,file):
 def get_ensembl_ids(entrez_ids):
     mg = get_client('gene')
     ensembl_id_raw = mg.querymany(entrez_ids, scopes='entrezgene', fields='ensembl.gene', species='human')
-    outlist,drop_list = [],[]
-    for ret in ensembl_id_raw[1:]:
+    translate, drop_list = {},[]
+    for ret in ensembl_id_raw:
+        query = int(ret['query'])
         if "ensembl" in ret:
             ret = ret['ensembl']
             if isinstance(ret, list):
                 ret = ret[0]
-            outlist.append(ret['gene'])
+            translate[query] = ret['gene']
         else:
-            drop_list.append(int(ret['query']))
-    return outlist, drop_list
+            drop_list.append(query)
+    return translate, drop_list
 
 def tcga_example():
     print("Downloading data ...")
@@ -71,26 +72,32 @@ def tcga_example():
         os.mkdir(".porch")
     except FileExistsError:
         pass
-    processed_brca_path = ".porch/proc_brca.tsv.tgz"
-    processed_clin_brca_path = ".porch/proc_clin_brca.tsv.tgz"
+    processed_brca_path = ".porch/proc_brca.tsv.gz"
+    processed_clin_brca_path = ".porch/proc_clin_brca.tsv.gz"
     if os.path.isfile(processed_brca_path) and os.path.isfile(processed_clin_brca_path):
-            brca = pd.read_csv(processed_brca_path, sep="\t")
-            brca_clin = pd.read_csv(processed_clin_brca_path, sep="\t")
+            brca = pd.read_csv(processed_brca_path, sep="\t",index_col=0)
+            brca_clin = pd.read_csv(processed_clin_brca_path, sep="\t",index_col=0)
     else:
             brca = get_expression_data(".porch/brca.tsv.gz", 'http://download.cbioportal.org/brca_tcga_pub2015.tar.gz',"data_RNA_Seq_v2_expression_median.txt")
             brca_clin_raw = get_clinical_data(".porch/brca_clin.tsv.gz", 'http://download.cbioportal.org/brca_tcga_pub2015.tar.gz',"data_clinical_sample.txt")
             print("Preprocessing data ...")
             brca.dropna(axis=0, how='any', inplace=True)
             brca = brca.loc[~(brca<=0.0).any(axis=1)]
-            ensembl_ids,drop_list = get_ensembl_ids(list(brca.index))
+            entrez2ensembl, drop_list = get_ensembl_ids(list(brca.index))
             # Convert all genenames we can, drop the rest
-            brca.drop(index=drop_list)
-            brca = pd.DataFrame(data=np.log2(brca), index=ensembl_ids, columns=brca.columns)
+            brca.drop(index=drop_list, inplace=True)
+            brca.rename(index=entrez2ensembl, inplace=True)
+            brca.index =  brca.index.map(str)
+            brca = pd.DataFrame(data=np.log2(brca.values), index=brca.index, columns=brca.columns)
             brca_clin = brca_clin_raw.loc[["PR status by ihc","ER Status By IHC","IHC-HER2"]].rename(index={"PR status by ihc" : "PR","ER Status By IHC":"ER","IHC-HER2":"HER2"})
+            mapping = {'Negative': 0, 'Positive': 1, '[Not Available]': 1, 'Equivocal' : 1, 'Indeterminate' : 1}
+            brca_clin.replace(mapping, inplace=True)
             brca.to_csv(processed_brca_path, sep="\t")
             brca_clin.to_csv(processed_clin_brca_path, sep="\t")
     print("Run Porch ...")
     results_df,evaluation_df = porch.porch_reactome(brca,brca_clin,"HSA",["Pathway ~ C(PR)","Pathway ~ C(ER)","Pathway ~ C(HER2)"])
+    print(results_df)
+    print(evaluation_df)
 
 def main():
     tcga_example()

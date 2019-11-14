@@ -2,6 +2,7 @@
 import numpy as np
 import pandas as pd
 from numpy.linalg import svd
+from sklearn.preprocessing import StandardScaler
 from statsmodels.formula.api import ols
 from statsmodels.stats.anova import anova_lm
 import urllib.request
@@ -13,8 +14,7 @@ def porch(expression_df, phenotype_df, geneset_df,
     tests = ["Pathway ~ C(Case)"]):
     """
     This is a the central routine of porch. It calculates pathway activities from the expression values of analytes,
-    with a grouping given by a pathway definition. If so specified, it tests the pathway activities with a set of user
-    specied tests
+    with a grouping given by a pathway definition. If so specified, it tests the pathway activities with a set of tests specified by the user
 
     Args:
         expression_df (pd.DataFrame): The DataFrame of the expression values we analyse. These values are logtransformed and subsequently standardized befor analysis
@@ -29,30 +29,32 @@ def porch(expression_df, phenotype_df, geneset_df,
         results_df, contains the output of the significance tests
         evaluation_df, contains the pathway activities
     """
-    phenotypes = phenotype_df.columns
-    phenotypes_bool = [col in phenotypes for col in geneset_df.columns]
+    phenotype_df =  phenotype_df[[ col for col in phenotype_df.columns  if col in expression_df.columns ]]
     evaluation_df = phenotype_df.copy()
     results_df = pd.DataFrame()
     set_df = geneset_df[[gene_column, set_column]]
+    set_of_all_genes = set(expression_df.index)
+    results,setnames,tested_vars = [],[],[]
     for setname, geneset in set_df.groupby([set_column]):
-        genes = list(geneset[gene_column])
-        results,setnames = [],[]
-        if len(genes)>1:
-            expr = geneset_df.loc[genes,phenotypes_bool]
-            expr_stand = pd.DataFrame(index=expr.index, columns=expr.columns,data=StandardScaler().fit_transform(np.log(expr.values.T)).T)
+        print("Processing " + setname)
+        genes = list(set(geneset[gene_column].tolist()) & set_of_all_genes)
+        expr = expression_df.loc[genes,phenotype_df.columns]
+        expr.dropna(axis=0, how='any', inplace=True)
+        expr = expr.loc[~(expr<=0.0).any(axis=1)]
+        if expr.shape[0]>1:
+            expr_stand = pd.DataFrame(index=expr.index,    columns=expr.columns,data=StandardScaler().fit_transform(np.log(expr.values.T)).T)
             U, S, Vt = svd(expr_stand.values,full_matrices=False)
             eigen_genes = (Vt.T)[:,0]
-            evaluation_df.loc[setname] = eigen_genes
-            result, columns = [],[]
+            evaluation_df.loc["Pathway"] = eigen_genes
+            result, tested_vars = [],[]
             for test in tests:
-                test.replace("Pathway",setname)
-                lm = ols(test, evaluation_df).fit()
-                pvals = anova_lm(lm)["PR(>F)"].T.iloc[:, :-1]
+                lm = ols(test, evaluation_df.T).fit()
+                pvals = anova_lm(lm)["PR(>F)"].T.iloc[:-1]
                 result += list(pvals.values)
-                columns += list(pvals.columns)
+                tested_vars += list(pvals.index)
             results += [result]
             setnames += [setname]
-    results_cols = MultiIndex.from_product([tests,columns],names=["Test","Variable"])
+    results_cols = pd.MultiIndex.from_product([tests,tested_vars],names=["Test","Variable"])
     results_df = pd.DataFrame(data=results, columns=results_cols,index=setnames)
     return results_df,evaluation_df
 
@@ -71,8 +73,8 @@ def download_file(path, url):
             output.write(stream.read())
     return path
 
-#reactome_fn = "Ensembl2Reactome_All_Levels.txt"
-reactome_fn = "UniProt2Reactome_All_Levels.txt"
+reactome_fn = "Ensembl2Reactome_All_Levels.txt"
+#reactome_fn = "UniProt2Reactome_All_Levels.txt"
 reactome_path = ".porch/" + reactome_fn
 reactome_url = "https://reactome.org/download/current/" + reactome_fn
 
@@ -83,6 +85,5 @@ def get_reactome_df(organism = "HSA"):
                         usecols=[0,1,3],
                         names=["gene","reactome_id","reactome_name"])
     organism = "R-" + organism
-    print(reactome_df["reactome_id"].str.startswith(organism))
     reactome_df = reactome_df[reactome_df["reactome_id"].str.startswith(organism) ]
     return reactome_df
