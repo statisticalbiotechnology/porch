@@ -6,4 +6,3 @@ pandas
 statsmodels
 mygene
 sklearn
-multiprocessing
