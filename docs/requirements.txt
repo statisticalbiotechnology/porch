@@ -5,3 +5,5 @@ numpy
 pandas
 statsmodels
 mygene
+sklearn
+multiprocessing
