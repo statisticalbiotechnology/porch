@@ -1,5 +1,6 @@
 # Porch
-Your method to a individualized pathway analysis scheme.  
+Your method to analyze your personal pathways.  
+
 ![porch](img/porch.jpg "Photo (c) [Sonja Lovas](https://www.flickr.com/photos/sonjalovas/4038233322)")  
 
 ## Background
