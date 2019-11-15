@@ -95,9 +95,10 @@ def tcga_example():
             brca.to_csv(processed_brca_path, sep="\t")
             brca_clin.to_csv(processed_clin_brca_path, sep="\t")
     print("Run Porch ...")
-    results_df,evaluation_df = porch.porch_reactome(brca,brca_clin,"HSA",["Pathway ~ C(PR)","Pathway ~ C(ER)","Pathway ~ C(HER2)"])
+    results_df,activity_df,untested = porch.porch_reactome(brca,brca_clin,"HSA",["Pathway ~ C(PR)","Pathway ~ C(ER)","Pathway ~ C(HER2)"])
     print(results_df)
-    print(evaluation_df)
+    print(activity_df)
+    print(untested)
 
 def main():
     tcga_example()
