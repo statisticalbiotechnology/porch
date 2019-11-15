@@ -22,7 +22,7 @@ Porch is a method for pathway analysis that estimates a single quantitative path
 ## Porch API
 
 ```eval_rst
-.. automodule:: porch
+.. automodule:: porch.porch
    :members:
 ```
 
