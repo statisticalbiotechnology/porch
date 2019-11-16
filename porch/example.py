@@ -1,3 +1,5 @@
+import matplotlib.pyplot as plt
+import seaborn as sns
 import numpy as np
 import pandas as pd
 import tarfile
@@ -74,31 +76,38 @@ def tcga_example():
         pass
     processed_brca_path = ".porch/proc_brca.tsv.gz"
     processed_clin_brca_path = ".porch/proc_clin_brca.tsv.gz"
+    significance_path  = ".porch/significance.tsv.gz"
+    activity_path = ".porch/activity.tsv.gz"
     if os.path.isfile(processed_brca_path) and os.path.isfile(processed_clin_brca_path):
-            brca = pd.read_csv(processed_brca_path, sep="\t",index_col=0)
-            brca_clin = pd.read_csv(processed_clin_brca_path, sep="\t",index_col=0)
+        brca = pd.read_csv(processed_brca_path, sep="\t",index_col=0)
+        brca_clin = pd.read_csv(processed_clin_brca_path, sep="\t",index_col=0)
     else:
-            brca = get_expression_data(".porch/brca.tsv.gz", 'http://download.cbioportal.org/brca_tcga_pub2015.tar.gz',"data_RNA_Seq_v2_expression_median.txt")
-            brca_clin_raw = get_clinical_data(".porch/brca_clin.tsv.gz", 'http://download.cbioportal.org/brca_tcga_pub2015.tar.gz',"data_clinical_sample.txt")
-            print("Preprocessing data ...")
-            brca.dropna(axis=0, how='any', inplace=True)
-            brca = brca.loc[~(brca<=0.0).any(axis=1)]
-            entrez2ensembl, drop_list = get_ensembl_ids(list(brca.index))
-            # Convert all genenames we can, drop the rest
-            brca.drop(index=drop_list, inplace=True)
-            brca.rename(index=entrez2ensembl, inplace=True)
-            brca.index =  brca.index.map(str)
-            brca = pd.DataFrame(data=np.log2(brca.values), index=brca.index, columns=brca.columns)
-            brca_clin = brca_clin_raw.loc[["PR status by ihc","ER Status By IHC","IHC-HER2"]].rename(index={"PR status by ihc" : "PR","ER Status By IHC":"ER","IHC-HER2":"HER2"})
-            mapping = {'Negative': 0, 'Positive': 1, '[Not Available]': 1, 'Equivocal' : 1, 'Indeterminate' : 1}
-            brca_clin.replace(mapping, inplace=True)
-            brca.to_csv(processed_brca_path, sep="\t")
-            brca_clin.to_csv(processed_clin_brca_path, sep="\t")
-    print("Run Porch ...")
-    results_df,activity_df,untested = porch.porch_reactome(brca,brca_clin,"HSA",["Pathway ~ C(PR)","Pathway ~ C(ER)","Pathway ~ C(HER2)"])
-    print(results_df)
-    print(activity_df)
-    print(untested)
+        brca = get_expression_data(".porch/brca.tsv.gz", 'http://download.cbioportal.org/brca_tcga_pub2015.tar.gz',"data_RNA_Seq_v2_expression_median.txt")
+        brca_clin_raw = get_clinical_data(".porch/brca_clin.tsv.gz", 'http://download.cbioportal.org/brca_tcga_pub2015.tar.gz',"data_clinical_sample.txt")
+        print("Preprocessing data ...")
+        brca.dropna(axis=0, how='any', inplace=True)
+        brca = brca.loc[~(brca<=0.0).any(axis=1)]
+        entrez2ensembl, drop_list = get_ensembl_ids(list(brca.index))
+        # Convert all genenames we can, drop the rest
+        brca.drop(index=drop_list, inplace=True)
+        brca.rename(index=entrez2ensembl, inplace=True)
+        brca.index =  brca.index.map(str)
+        brca = pd.DataFrame(data=np.log2(brca.values), index=brca.index, columns=brca.columns)
+        brca_clin = brca_clin_raw.loc[["PR status by ihc","ER Status By IHC","IHC-HER2"]].rename(index={"PR status by ihc" : "PR","ER Status By IHC":"ER","IHC-HER2":"HER2"})
+        mapping = {'Negative': 0, 'Positive': 1, '[Not Available]': 1, 'Equivocal' : 1, 'Indeterminate' : 1}
+        brca_clin.replace(mapping, inplace=True)
+        brca.to_csv(processed_brca_path, sep="\t")
+        brca_clin.to_csv(processed_clin_brca_path, sep="\t")
+    if os.path.isfile(significance_path) and os.path.isfile(activity_path):
+        significance = pd.read_csv(significance_path, sep="\t",index_col=0)
+        activity = pd.read_csv(activity_path, sep="\t",index_col=0)
+    else:
+        print("Run Porch ...")
+        significance,activity,untested = porch.porch_reactome(brca,brca_clin,"HSA",["Pathway ~ C(PR)","Pathway ~ C(ER)","Pathway ~ C(HER2)"])
+        significance.to_csv(significance_path, sep="\t")
+        activity.to_csv(activity_path, sep="\t")
+    sns.distplot(activity.loc["R-HSA-8931987"], kde=False)
+    plt.show()
 
 def main():
     tcga_example()
