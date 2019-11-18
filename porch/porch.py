@@ -40,7 +40,6 @@ def porch_single_process(expression_df, phenotype_df, geneset_df,
     results, setnames, untested, activities, tested_vars = [], [], [], [], None
     for setname, geneset in set_df.groupby([set_column]):
         genes = list(set(geneset[gene_column].tolist()) & set_of_all_genes)
-        call_args += []
         setname, result, activity, variables = porch_proc(setname, genes, expression_df, phenotype_df,tests)
         if result:
             results += [result]
@@ -111,7 +110,7 @@ def porch_proc(setname, genes, expression_df, phenotype_df,tests,keep_feature_st
     expr = expression_df.loc[genes]
     expr.dropna(axis=0, how='any', inplace=True)
     expr = expr.loc[~(expr<=0.0).any(axis=1)]
-    if expr.shape[0]>1:
+    if expr.shape[0]>2:
         standardizer = StandardScaler(with_std=keep_feature_stdv)
         log_data = np.log(expr.values.T)
         standard_log_data = standardizer.fit_transform(log_data).T
@@ -133,7 +132,7 @@ def porch_proc(setname, genes, expression_df, phenotype_df,tests,keep_feature_st
 def porch_reactome(expression_df, phenotype_df, organism = "HSA", tests = ["Pathway ~ C(Case)"]):
     "This is a function"
     reactome_df = get_reactome_df(organism)
-    return porch(expression_df, phenotype_df, reactome_df,
+    return porch_single_process(expression_df, phenotype_df, reactome_df,
         "gene", "reactome_id", tests)
 
 

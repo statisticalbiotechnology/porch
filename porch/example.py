@@ -8,6 +8,13 @@ import os
 import porch
 from biothings_client import get_client
 
+cashe_directory = ".porch"
+expression_name = "brca"
+phenotype_name = "brca_clin"
+preprcoc_prefix = "proc_"
+significance_name  = "significance"
+activity_name = "activity"
+
 def track_dl(url,tar):
     response = requests.get(url, stream=True)
     with open(tar, "wb") as handle:
@@ -68,34 +75,45 @@ def get_ensembl_ids(entrez_ids):
             drop_list.append(query)
     return translate, drop_list
 
+def tcga_preprocess(brca, brca_clin):
+    brca.dropna(axis=0, how='any', inplace=True)
+    brca = brca.loc[~(brca<=0.0).any(axis=1)].copy()
+    entrez2ensembl, drop_list = get_ensembl_ids(list(brca.index))
+    # Convert all genenames we can, drop the rest
+    brca.drop(index=drop_list, inplace=True)
+    brca.rename(index=entrez2ensembl, inplace=True)
+    #brca.index =  brca.index.map(str)
+    #brca = pd.DataFrame(data=np.log2(brca.values), index=brca.index, columns=brca.columns)
+    brca = pd.DataFrame(data=np.log2(brca.values), index=brca.index, columns=brca.columns)
+    brca_clin = brca_clin.loc[["PR status by ihc","ER Status By IHC","IHC-HER2"]].rename(index={"PR status by ihc" : "PR","ER Status By IHC":"ER","IHC-HER2":"HER2"})
+    relevant_col = brca_clin.T["PR"].isin(['Negative', 'Positive']) & brca_clin.T["ER"].isin(['Negative', 'Positive']) & brca_clin.T["HER2"].isin(['Negative', 'Positive'])
+    brca_clin = brca_clin.T[relevant_col].T
+    brca = brca.T[relevant_col].T
+    # mapping = {'Negative': 0, 'Positive': 1, '[Not Available]': 1, 'Equivocal' : 1, 'Indeterminate' : 1}
+    mapping = {'Negative': 0, 'Positive': 1}
+    brca_clin.replace(mapping, inplace=True)
+    return brca, brca_clin
+
 def tcga_example():
     print("Downloading data ...")
     try:
-        os.mkdir(".porch")
+        os.mkdir(cashe_directory)
     except FileExistsError:
         pass
-    processed_brca_path = ".porch/proc_brca.tsv.gz"
-    processed_clin_brca_path = ".porch/proc_clin_brca.tsv.gz"
-    significance_path  = ".porch/significance.tsv.gz"
-    activity_path = ".porch/activity.tsv.gz"
+    brca_path = cashe_directory + "/" + expression_name + ".tsv.gz"
+    clin_brca_path = cashe_directory + "/" + phenotype_name + ".tsv.gz"
+    processed_brca_path = cashe_directory + "/" + preprcoc_prefix + expression_name + ".tsv.gz"
+    processed_clin_brca_path = cashe_directory + "/" + preprcoc_prefix + phenotype_name + ".tsv.gz"
+    significance_path  = cashe_directory + "/" + significance_name + ".tsv.gz"
+    activity_path = cashe_directory + "/" + activity_name + ".tsv.gz"
     if os.path.isfile(processed_brca_path) and os.path.isfile(processed_clin_brca_path):
         brca = pd.read_csv(processed_brca_path, sep="\t",index_col=0)
         brca_clin = pd.read_csv(processed_clin_brca_path, sep="\t",index_col=0)
     else:
-        brca = get_expression_data(".porch/brca.tsv.gz", 'http://download.cbioportal.org/brca_tcga_pub2015.tar.gz',"data_RNA_Seq_v2_expression_median.txt")
-        brca_clin_raw = get_clinical_data(".porch/brca_clin.tsv.gz", 'http://download.cbioportal.org/brca_tcga_pub2015.tar.gz',"data_clinical_sample.txt")
+        brca = get_expression_data(brca_path, 'http://download.cbioportal.org/brca_tcga_pub2015.tar.gz',"data_RNA_Seq_v2_expression_median.txt")
+        brca_clin = get_clinical_data(clin_brca_path, 'http://download.cbioportal.org/brca_tcga_pub2015.tar.gz',"data_clinical_sample.txt")
         print("Preprocessing data ...")
-        brca.dropna(axis=0, how='any', inplace=True)
-        brca = brca.loc[~(brca<=0.0).any(axis=1)]
-        entrez2ensembl, drop_list = get_ensembl_ids(list(brca.index))
-        # Convert all genenames we can, drop the rest
-        brca.drop(index=drop_list, inplace=True)
-        brca.rename(index=entrez2ensembl, inplace=True)
-        brca.index =  brca.index.map(str)
-        brca = pd.DataFrame(data=np.log2(brca.values), index=brca.index, columns=brca.columns)
-        brca_clin = brca_clin_raw.loc[["PR status by ihc","ER Status By IHC","IHC-HER2"]].rename(index={"PR status by ihc" : "PR","ER Status By IHC":"ER","IHC-HER2":"HER2"})
-        mapping = {'Negative': 0, 'Positive': 1, '[Not Available]': 1, 'Equivocal' : 1, 'Indeterminate' : 1}
-        brca_clin.replace(mapping, inplace=True)
+        brca, brca_clin = tcga_preprocess(brca, brca_clin)
         brca.to_csv(processed_brca_path, sep="\t")
         brca_clin.to_csv(processed_clin_brca_path, sep="\t")
     if os.path.isfile(significance_path) and os.path.isfile(activity_path):
@@ -103,10 +121,18 @@ def tcga_example():
         activity = pd.read_csv(activity_path, sep="\t",index_col=0)
     else:
         print("Run Porch ...")
+        print(brca.shape)
+        print(brca_clin.shape)
         significance,activity,untested = porch.porch_reactome(brca,brca_clin,"HSA",["Pathway ~ C(PR)","Pathway ~ C(ER)","Pathway ~ C(HER2)"])
         significance.to_csv(significance_path, sep="\t")
         activity.to_csv(activity_path, sep="\t")
-    sns.distplot(activity.loc["R-HSA-8931987"], kde=False)
+    tripple_neg = (brca_clin.T["PR"] == 0) & (brca_clin.T["ER"] == 0) & (brca_clin.T["HER2"] == 0)
+    print(tripple_neg)
+    print(~tripple_neg)
+    runx1 = activity.loc["R-HSA-8931987",:].T
+    print(runx1)
+    sns.distplot(runx1[tripple_neg], kde=False)
+    sns.distplot(activity.T["R-HSA-8931987"][~tripple_neg], kde=False)
     plt.show()
 
 def main():
