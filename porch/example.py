@@ -5,8 +5,9 @@ import pandas as pd
 import tarfile
 import requests
 import os
-import porch
 from biothings_client import get_client
+import porch
+import qvalue as qv
 
 cashe_directory = ".porch"
 expression_name = "brca"
@@ -104,8 +105,8 @@ def tcga_example():
     clin_brca_path = cashe_directory + "/" + phenotype_name + ".tsv.gz"
     processed_brca_path = cashe_directory + "/" + preprcoc_prefix + expression_name + ".tsv.gz"
     processed_clin_brca_path = cashe_directory + "/" + preprcoc_prefix + phenotype_name + ".tsv.gz"
-    significance_path  = cashe_directory + "/" + significance_name + ".tsv.gz"
-    activity_path = cashe_directory + "/" + activity_name + ".tsv.gz"
+    significance_path  = cashe_directory + "/" + significance_name + ".tsv"
+    activity_path = cashe_directory + "/" + activity_name + ".tsv"
     if os.path.isfile(processed_brca_path) and os.path.isfile(processed_clin_brca_path):
         brca = pd.read_csv(processed_brca_path, sep="\t",index_col=0)
         brca_clin = pd.read_csv(processed_clin_brca_path, sep="\t",index_col=0)
@@ -117,23 +118,49 @@ def tcga_example():
         brca.to_csv(processed_brca_path, sep="\t")
         brca_clin.to_csv(processed_clin_brca_path, sep="\t")
     if os.path.isfile(significance_path) and os.path.isfile(activity_path):
-        significance = pd.read_csv(significance_path, sep="\t",index_col=0)
+        significance = pd.read_csv(significance_path, sep="\t",index_col=["Test","Variable"]).T
         activity = pd.read_csv(activity_path, sep="\t",index_col=0)
     else:
         print("Run Porch ...")
-        print(brca.shape)
-        print(brca_clin.shape)
-        significance,activity,untested = porch.porch_reactome(brca,brca_clin,"HSA",["Pathway ~ C(PR)","Pathway ~ C(ER)","Pathway ~ C(HER2)"])
-        significance.to_csv(significance_path, sep="\t")
+        significance,activity,untested = porch.porch_reactome(brca,brca_clin,"HSA",["Pathway ~ C(PR) + C(HER2)","Pathway ~ C(PR) + C(ER) + C(PR):C(ER)","Pathway ~ C(PR) + C(ER)"])
+        significance.T.to_csv(significance_path, sep="\t",index_label=["Test","Variable"])
         activity.to_csv(activity_path, sep="\t")
+    ## Plot the activity of R-HSA-8931987 in TNBC vs non-TNBC
     tripple_neg = (brca_clin.T["PR"] == 0) & (brca_clin.T["ER"] == 0) & (brca_clin.T["HER2"] == 0)
-    print(tripple_neg)
-    print(~tripple_neg)
     runx1 = activity.loc["R-HSA-8931987",:].T
-    print(runx1)
-    sns.distplot(runx1[tripple_neg], kde=False)
-    sns.distplot(activity.T["R-HSA-8931987"][~tripple_neg], kde=False)
+    fig = plt.figure(figsize=(10,6))
+    sns.distplot(runx1[tripple_neg], kde=False,norm_hist=True)
+    sns.distplot(runx1[~tripple_neg], kde=False,norm_hist=True)
+    plt.legend(labels=['TNBC','Non-TNBC'],loc='upper right')
+    plt.ylabel('Density')
+    plt.xlabel('Activity of \"RUNX1 regulates estrogen receptor mediated transcription\"')
+#    plt.show()
+    plt.savefig("rux1.png")
+
+    # Scatterplots
+    qv.qvalues(significance, ("Pathway ~ C(PR) + C(ER)","C(PR)"), ("Pathway ~ C(PR) + C(ER)","q value PR"))
+    qv.qvalues(significance, ("Pathway ~ C(PR) + C(ER)","C(ER)"), ("Pathway ~ C(PR) + C(ER)","q value ER"))
+    fig = plt.figure(figsize=(10,6))
+    g = sns.scatterplot(data=significance,x=("Pathway ~ C(PR) + C(ER)","q value PR"),y=("Pathway ~ C(PR) + C(ER)","q value ER"))
+    g.set_xscale('log')
+    g.set_yscale('log')
+    g.set_xlim(10e-80,0.5)
+    g.set_ylim(10e-50,0.5)
+    plt.savefig("PRvsER.png")
+
+    qv.qvalues(significance, ("Pathway ~ C(PR) + C(ER) + C(PR):C(ER)","C(PR)"), ("Pathway ~ C(PR) + C(ER) + C(PR):C(ER)","q value PR"))
+    qv.qvalues(significance, ("Pathway ~ C(PR) + C(ER) + C(PR):C(ER)","C(PR):C(ER)"), ("Pathway ~ C(PR) + C(ER) + C(PR):C(ER)","q value PR:ER"))
+    fig = plt.figure(figsize=(10,6))
+    g = sns.scatterplot(data=significance,x=("Pathway ~ C(PR) + C(ER) + C(PR):C(ER)","q value PR"),y=("Pathway ~ C(PR) + C(ER) + C(PR):C(ER)","q value PR:ER"))
+    g.set_xscale('log')
+    g.set_yscale('log')
+   g.set_xlim(10e-80,0.5)
+    g.set_ylim(10e-5,0.9)
+    g.autoscale()
+    plt.savefig("PRvsPRER.png")
     plt.show()
+
+
 
 def main():
     tcga_example()

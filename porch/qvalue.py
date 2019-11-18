@@ -51,7 +51,6 @@ def qvalues(pvalues,p_col = "p", q_col ="q"):
     Returns:
         The modified DataFrame.
     """
-
     m = pvalues.shape[0] # The number of p-values
     pvalues.sort_values(p_col,inplace=True) # sort the pvalues in acending order
     pi0 = estimatePi0(list(pvalues[p_col].values))
