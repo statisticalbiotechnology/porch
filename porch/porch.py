@@ -13,7 +13,7 @@ import sys
 
 def porch_single_process(expression_df, phenotype_df, geneset_df,
     gene_column = "gene", set_column = "pathway",
-    tests = ["Pathway ~ C(Case)"]):
+    test = "Pathway ~ C(Case)"):
     """
     This is a the central routine of porch. It calculates pathway activities from the expression values of analytes,
     with a grouping given by a pathway definition. If so specified, it tests the pathway activities with a set of tests specified by the user
@@ -24,7 +24,7 @@ def porch_single_process(expression_df, phenotype_df, geneset_df,
         geneset_df (pd.DataFrame): The DataFrame of the pathway definitions.
         gene_column (str): The name of the column within geneset_df containing names of analytes.
         set_column (str): The name of the column within geneset_df containing names of pathways.
-        tests (list): List of specification of tests that should be performed.
+        test (str): linear model that should be tested. The model should contain the variable Pathway, that will be replaced with each pathway's activity.
 
     Returns:
         results_df, activity_df, untested
@@ -40,7 +40,8 @@ def porch_single_process(expression_df, phenotype_df, geneset_df,
     results, setnames, untested, activities, tested_vars = [], [], [], [], None
     for setname, geneset in set_df.groupby([set_column]):
         genes = list(set(geneset[gene_column].tolist()) & set_of_all_genes)
-        setname, result, activity, variables = porch_proc(setname, genes, expression_df, phenotype_df,tests)
+        proc = ProcessingMethod.getInstance().getMethod()
+        setname, result, activity, variables = proc(setname, genes, expression_df, phenotype_df,test)
         if result:
             results += [result]
             setnames += [setname]
@@ -49,15 +50,14 @@ def porch_single_process(expression_df, phenotype_df, geneset_df,
                 tested_vars = variables
         else:
             untested += [setname]
-    results_cols = pd.MultiIndex.from_tuples(tested_vars, names=["Test","Variable"])
-    results_df = pd.DataFrame(data=results, columns=results_cols,index=setnames)
+    results_df = pd.DataFrame(data=results, columns=tested_vars,index=setnames)
     activity_df = pd.DataFrame(data=activities, columns=expression_df.columns, index=setnames)
     return results_df, activity_df, untested
 
 
 def porch(expression_df, phenotype_df, geneset_df,
     gene_column = "gene", set_column = "pathway",
-    tests = ["Pathway ~ C(Case)"]):
+    test = "Pathway ~ C(Case)"):
     """
     This is a the central routine of porch. It calculates pathway activities from the expression values of analytes,
     with a grouping given by a pathway definition. If so specified, it tests the pathway activities with a set of tests specified by the user
@@ -68,7 +68,7 @@ def porch(expression_df, phenotype_df, geneset_df,
         geneset_df (pd.DataFrame): The DataFrame of the pathway definitions.
         gene_column (str): The name of the column within geneset_df containing names of analytes.
         set_column (str): The name of the column within geneset_df containing names of pathways.
-        tests (list): List of specification of tests that should be performed.
+        test (str): linear model that should be tested. The model should contain the variable Pathway, that will be replaced with each pathway's activity.
 
     Returns:
         results_df, activity_df, untested
@@ -84,11 +84,11 @@ def porch(expression_df, phenotype_df, geneset_df,
     call_args = []
     for setname, geneset in set_df.groupby([set_column]):
         genes = list(set(geneset[gene_column].tolist()) & set_of_all_genes)
-        call_args += [(setname, genes, expression_df, phenotype_df,tests)]
+        call_args += [(setname, genes, expression_df, phenotype_df,test)]
     print("Processing with {} parallel processes".format(os.cpu_count()), file=sys.stderr)
     results, setnames, untested, activities, tested_vars = [], [], [], [], None
     with multiprocessing.Pool() as executor:
-        for setname, result, activity, variables in executor.starmap(porch_proc,  call_args):
+        for setname, result, activity, variables in executor.starmap(ProcessingMethod.getInstance().getMethod(),  call_args):
             if result:
                 results += [result]
                 setnames += [setname]
@@ -97,13 +97,12 @@ def porch(expression_df, phenotype_df, geneset_df,
                     tested_vars = variables
             else:
                 untested += [setname]
-    results_cols = pd.MultiIndex.from_tuples(tested_vars, names=["Test","Variable"])
-    results_df = pd.DataFrame(data=results, columns=results_cols,index=setnames)
+    results_df = pd.DataFrame(data=results, columns=tested_vars,index=setnames)
     activity_df = pd.DataFrame(data=activities, columns=expression_df.columns, index=setnames)
     return results_df, activity_df, untested
 
 
-def porch_proc(setname, genes, expression_df, phenotype_df,tests,keep_feature_stdv=True):
+def porch_proc(setname, genes, expression_df, phenotype_df,test,keep_feature_stdv=True):
     """ Core processing node of porch. Takes the analysis from expression values to significance testing. """
     print("Processing " + setname, file=sys.stderr)
     evaluation_df = phenotype_df.copy()
@@ -112,29 +111,48 @@ def porch_proc(setname, genes, expression_df, phenotype_df,tests,keep_feature_st
     expr = expr.loc[~(expr<=0.0).any(axis=1)]
     if expr.shape[0]>2:
         standardizer = StandardScaler(with_std=keep_feature_stdv)
-        log_data = np.log(expr.values.T)
+        log_data = np.log(expr.values.T.astype(float))
         standard_log_data = standardizer.fit_transform(log_data).T
         U, S, Vt = svd(standard_log_data, full_matrices=False)
         eigen_genes = (Vt.T)[:,0]
         evaluation_df.loc["Pathway"] = eigen_genes
-        result, tested_vars = [],[]
-        for test in tests:
-            lm = ols(test, evaluation_df.T).fit()
-            pvals = anova_lm(lm)["PR(>F)"].T.iloc[:-1]
-            result += list(pvals.values)
-            tested_vars += [(test,var) for var in list(pvals.index)]
+        lm = ols(test, evaluation_df.T).fit()
+        pvals = anova_lm(lm)["PR(>F)"].T.iloc[:-1]
+        result = list(pvals.values)
+        tested_vars = list(pvals.index)
         return setname, result, evaluation_df.loc["Pathway"].values, tested_vars
     else:
         print("Not enough data to evaluate " + setname, file=sys.stderr)
         return setname, None, None, None
 
-
-def porch_reactome(expression_df, phenotype_df, organism = "HSA", tests = ["Pathway ~ C(Case)"]):
+def porch_reactome(expression_df, phenotype_df, organism = "HSA", test = "Pathway ~ C(Case)"):
     "This is a function"
     reactome_df = get_reactome_df(organism)
-    return porch_single_process(expression_df, phenotype_df, reactome_df,
-        "gene", "reactome_id", tests)
+#    return porch_single_process(expression_df, phenotype_df, reactome_df, "gene", "reactome_id", test)
+    return porch(expression_df, phenotype_df, reactome_df,
+        "gene", "reactome_id", test)
 
+class ProcessingMethod:
+    __instance = None
+    @staticmethod
+    def getInstance():
+        """ Static access method. """
+        if ProcessingMethod.__instance == None:
+            ProcessingMethod()
+        return ProcessingMethod.__instance
+
+    def __init__(self, method="svd"):
+        """ Virtually private constructor. """
+        if ProcessingMethod.__instance != None:
+            raise Exception("This class is a singleton!")
+        else:
+            ProcessingMethod.__instance = self
+            if method == "svd":
+                self.method = porch_proc
+            else:
+                raise Exception("Method {} is not avalable!".format(method))
+    def getMethod(self):
+        return self.method
 
 def download_file(path, url):
     "This function downloads a file, path, from an url, if the file does not already exist"

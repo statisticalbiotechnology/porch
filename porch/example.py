@@ -118,19 +118,20 @@ def tcga_example():
         brca.to_csv(processed_brca_path, sep="\t")
         brca_clin.to_csv(processed_clin_brca_path, sep="\t")
     if os.path.isfile(significance_path) and os.path.isfile(activity_path):
-        significance = pd.read_csv(significance_path, sep="\t",index_col=["Test","Variable"]).T
+        significance = pd.read_csv(significance_path, sep="\t",index_col=0).T
         activity = pd.read_csv(activity_path, sep="\t",index_col=0)
     else:
         print("Run Porch ...")
-        significance,activity,untested = porch.porch_reactome(brca,brca_clin,"HSA",["Pathway ~ C(PR) + C(HER2)","Pathway ~ C(PR) + C(ER) + C(PR):C(ER)","Pathway ~ C(PR) + C(ER)"])
-        significance.T.to_csv(significance_path, sep="\t",index_label=["Test","Variable"])
+        significance,activity,untested = porch.porch_reactome(brca,brca_clin,"HSA","Pathway ~ C(PR) + C(ER) + C(PR):C(ER)")
+        significance.T.to_csv(significance_path, sep="\t")
         activity.to_csv(activity_path, sep="\t")
     ## Plot the activity of R-HSA-8931987 in TNBC vs non-TNBC
+    sns.set_palette("bright")
     tripple_neg = (brca_clin.T["PR"] == 0) & (brca_clin.T["ER"] == 0) & (brca_clin.T["HER2"] == 0)
     runx1 = activity.loc["R-HSA-8931987",:].T
     fig = plt.figure(figsize=(10,6))
-    sns.distplot(runx1[tripple_neg], kde=False,norm_hist=True)
-    sns.distplot(runx1[~tripple_neg], kde=False,norm_hist=True)
+    sns.distplot(runx1[tripple_neg], kde=False,norm_hist=True, color="red")
+    sns.distplot(runx1[~tripple_neg], kde=False,norm_hist=True, color="blue")
     plt.legend(labels=['TNBC','Non-TNBC'],loc='upper right')
     plt.ylabel('Density')
     plt.xlabel('Activity of \"RUNX1 regulates estrogen receptor mediated transcription\"')
@@ -138,23 +139,22 @@ def tcga_example():
     plt.savefig("rux1.png")
 
     # Scatterplots
-    qv.qvalues(significance, ("Pathway ~ C(PR) + C(ER)","C(PR)"), ("Pathway ~ C(PR) + C(ER)","q value PR"))
-    qv.qvalues(significance, ("Pathway ~ C(PR) + C(ER)","C(ER)"), ("Pathway ~ C(PR) + C(ER)","q value ER"))
+    qv.qvalues(significance,"C(PR)", "q value PR")
+    qv.qvalues(significance, "C(ER)","q value ER")
+    qv.qvalues(significance, "C(PR):C(ER)", "q value PR:ER")
     fig = plt.figure(figsize=(10,6))
-    g = sns.scatterplot(data=significance,x=("Pathway ~ C(PR) + C(ER)","q value PR"),y=("Pathway ~ C(PR) + C(ER)","q value ER"))
+    g = sns.scatterplot(data=significance,x="q value PR",y="q value ER")
     g.set_xscale('log')
     g.set_yscale('log')
     g.set_xlim(10e-80,0.5)
     g.set_ylim(10e-50,0.5)
     plt.savefig("PRvsER.png")
 
-    qv.qvalues(significance, ("Pathway ~ C(PR) + C(ER) + C(PR):C(ER)","C(PR)"), ("Pathway ~ C(PR) + C(ER) + C(PR):C(ER)","q value PR"))
-    qv.qvalues(significance, ("Pathway ~ C(PR) + C(ER) + C(PR):C(ER)","C(PR):C(ER)"), ("Pathway ~ C(PR) + C(ER) + C(PR):C(ER)","q value PR:ER"))
     fig = plt.figure(figsize=(10,6))
-    g = sns.scatterplot(data=significance,x=("Pathway ~ C(PR) + C(ER) + C(PR):C(ER)","q value PR"),y=("Pathway ~ C(PR) + C(ER) + C(PR):C(ER)","q value PR:ER"))
+    g = sns.scatterplot(data=significance, x="q value PR", y="q value PR:ER")
     g.set_xscale('log')
     g.set_yscale('log')
-   g.set_xlim(10e-80,0.5)
+    g.set_xlim(10e-80,0.5)
     g.set_ylim(10e-5,0.9)
     g.autoscale()
     plt.savefig("PRvsPRER.png")
