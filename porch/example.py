@@ -16,50 +16,70 @@ preprcoc_prefix = "proc_"
 significance_name  = "significance"
 activity_name = "activity"
 
-def track_dl(url,tar):
-    response = requests.get(url, stream=True)
-    with open(tar, "wb") as handle:
-        for data in response.iter_content():
-            handle.write(data)
+class FileTracker:
+    def __init__(self, file_name):
+        self.file_name = file_name
 
-def get_tar(url,path):
-    try:
-        tf = tarfile.open(path)
-    except:
-        track_dl(url, path)
-        tf = tarfile.open(path)
-    return tf
+    def track_dl(self,url,fileN):
+        response = requests.get(url, stream=True)
+        with open(fileN, "wb") as handle:
+            for data in response.iter_content():
+                handle.write(data)
+        self.file_name = fileN
 
-def get_expression_data(path,url,file):
-    df = get_data(path,url,file)
-    df.dropna(axis=0, how='any', inplace=True)
-#    df.set_index('Hugo_Symbol', inplace=True)
-    df.set_index('Entrez_Gene_Id', inplace=True)
-    #df.drop(columns=['Unnamed: 0', 'Entrez_Gene_Id'], inplace=True)
-    #df.drop(columns=['Entrez_Gene_Id'], inplace=True)
-    df.drop(columns=['Hugo_Symbol'], inplace=True)
-    df = df.reindex(sorted(df.columns), axis=1)
-    return df
+    def read_file(self):
+        if not os.path.isfile(self.file_name):
+            raise Exception
+        return pd.read_csv(self.file_name, sep="\t",index_col=0)
 
-def get_clinical_data(path,url,file):
-    df = get_data(path,url,file).T
-    df.columns = df.loc["Sample Identifier"]
-    df.drop(columns=["A unique sample identifier.","STRING","1","SAMPLE_ID"], inplace=True,errors='ignore')
-    if 'TCGA-BH-A1ES-01' in df.columns:
-        df.drop(columns=['TCGA-BH-A1ES-01'], inplace=True)
-    df.drop(index=["Unnamed: 0","#Patient Identifier","Sample Identifier","Other Sample ID"], inplace=True,errors='ignore')
-    df = df.reindex(sorted(df.columns), axis=1)
-    return df
+    def write_file(self,df):
+        df.to_csv(self.file_name, sep="\t")
 
-def get_data(path,url,file):
-    try:
-        df = pd.read_csv(path, sep="\t",index_col=0)
-    except:
-        tf = get_tar(url,".porch/my.tar.gz")
-        tf.extract(file,".porch/")
-        df = pd.read_csv(".porch/" + file, sep="\t")
-        df.to_csv(path, sep="\t")
-    return df
+
+class TarTracker(FileTracker):
+    def __init__(self, url,cashe_dir = ".porch", tar_name = "my.tar.gz"):
+        self.file_name = os.path.join(cashe_dir,tar_name)
+        self.cashe_dir = cashe_dir
+        self.url = url
+
+    def get_handle_for_tar(self):
+        try:
+            tf = tarfile.open(self.file_name)
+        except:
+            self.track_dl(self.url, self.file_name)
+            tf = tarfile.open(self.file_name)
+        return tf
+
+    def get_data(self,path,file):
+        try:
+            df = pd.read_csv(path, sep="\t",index_col=0)
+        except:
+            tf = self.get_handle_for_tar()
+            tf.extract(file,self.cashe_dir )
+            df = pd.read_csv(os.path.join(self.cashe_dir, file), sep="\t")
+            df.to_csv(path, sep="\t")
+        return df
+
+class TcgaTracker(TarTracker):
+    def get_expression_data(self, path, file):
+        df = self.get_data(path, file)
+        df.dropna(axis=0, how='any', inplace=True)
+        df.set_index('Entrez_Gene_Id', inplace=True)
+        #df.drop(columns=['Unnamed: 0', 'Entrez_Gene_Id'], inplace=True)
+        #df.drop(columns=['Entrez_Gene_Id'], inplace=True)
+        df.drop(columns=['Hugo_Symbol'], inplace=True)
+        df = df.reindex(sorted(df.columns), axis=1)
+        return df
+
+    def get_clinical_data(self, path, file):
+        df = self.get_data(path, file).T
+        df.columns = df.loc["Sample Identifier"]
+        df.drop(columns=["A unique sample identifier.","STRING","1","SAMPLE_ID"], inplace=True,errors='ignore')
+        if 'TCGA-BH-A1ES-01' in df.columns:
+            df.drop(columns=['TCGA-BH-A1ES-01'], inplace=True)
+        df.drop(index=["Unnamed: 0","#Patient Identifier","Sample Identifier","Other Sample ID"], inplace=True,errors='ignore')
+        df = df.reindex(sorted(df.columns), axis=1)
+        return df
 
 def get_ensembl_ids(entrez_ids):
     mg = get_client('gene')
@@ -95,36 +115,43 @@ def tcga_preprocess(brca, brca_clin):
     brca_clin.replace(mapping, inplace=True)
     return brca, brca_clin
 
-def tcga_example():
+def tcga_read_data():
+    """This functtion is quite convoluted as it downloads one tarfile and extracts two dataframes. The function also cashes intermediate files"""
     print("Downloading data ...")
     try:
         os.mkdir(cashe_directory)
     except FileExistsError:
         pass
-    brca_path = cashe_directory + "/" + expression_name + ".tsv.gz"
-    clin_brca_path = cashe_directory + "/" + phenotype_name + ".tsv.gz"
-    processed_brca_path = cashe_directory + "/" + preprcoc_prefix + expression_name + ".tsv.gz"
-    processed_clin_brca_path = cashe_directory + "/" + preprcoc_prefix + phenotype_name + ".tsv.gz"
-    significance_path  = cashe_directory + "/" + significance_name + ".tsv"
-    activity_path = cashe_directory + "/" + activity_name + ".tsv"
-    if os.path.isfile(processed_brca_path) and os.path.isfile(processed_clin_brca_path):
-        brca = pd.read_csv(processed_brca_path, sep="\t",index_col=0)
-        brca_clin = pd.read_csv(processed_clin_brca_path, sep="\t",index_col=0)
-    else:
-        brca = get_expression_data(brca_path, 'http://download.cbioportal.org/brca_tcga_pub2015.tar.gz',"data_RNA_Seq_v2_expression_median.txt")
-        brca_clin = get_clinical_data(clin_brca_path, 'http://download.cbioportal.org/brca_tcga_pub2015.tar.gz',"data_clinical_sample.txt")
+
+    brca_path= os.path.join(cashe_directory,  expression_name + ".tsv.gz")
+    brca_clin_path = os.path.join(cashe_directory,  phenotype_name + ".tsv.gz")
+    proc_brca_t = FileTracker(os.path.join(cashe_directory,  preprcoc_prefix + expression_name + ".tsv.gz"))
+    proc_brca_clin_t = FileTracker(os.path.join(cashe_directory,  preprcoc_prefix + phenotype_name + ".tsv.gz"))
+    tcga = TcgaTracker('http://download.cbioportal.org/brca_tcga_pub2015.tar.gz', cashe_directory, "my.tar.gz")
+    try:
+        brca = proc_brca_t.read_file()
+        brca_clin = proc_brca_clin_t.read_file()
+    except Exception:
+        brca = tcga.get_expression_data(brca_path,"data_RNA_Seq_v2_expression_median.txt")
+        brca_clin = tcga.get_clinical_data(brca_clin_path,"data_clinical_sample.txt")
         print("Preprocessing data ...")
         brca, brca_clin = tcga_preprocess(brca, brca_clin)
-        brca.to_csv(processed_brca_path, sep="\t")
-        brca_clin.to_csv(processed_clin_brca_path, sep="\t")
-    if os.path.isfile(significance_path) and os.path.isfile(activity_path):
-        significance = pd.read_csv(significance_path, sep="\t",index_col=0).T
-        activity = pd.read_csv(activity_path, sep="\t",index_col=0)
-    else:
+        proc_brca_t.write_file(brca)
+        proc_brca_clin_t.write_file(brca_clin)
+    return brca, brca_clin
+
+def tcga_example():
+    brca, brca_clin = tcga_read_data()
+    significance_t  = FileTracker(os.path.join(cashe_directory,  significance_name + ".tsv"))
+    activity_t = FileTracker(os.path.join(cashe_directory,  activity_name + ".tsv"))
+    try:
+        significance = significance_t.read_file().T
+        activity = activity_t.read_file()
+    except Exception:
         print("Run Porch ...")
         significance,activity,untested = porch.porch_reactome(brca,brca_clin,"HSA","Pathway ~ C(PR) + C(ER) + C(PR):C(ER)")
-        significance.T.to_csv(significance_path, sep="\t")
-        activity.to_csv(activity_path, sep="\t")
+        significance_t.write_file(significance.T)
+        activity_t.write_file(activity)
     ## Plot the activity of R-HSA-8931987 in TNBC vs non-TNBC
     sns.set_palette("bright")
     tripple_neg = (brca_clin.T["PR"] == 0) & (brca_clin.T["ER"] == 0) & (brca_clin.T["HER2"] == 0)
@@ -159,8 +186,6 @@ def tcga_example():
     g.autoscale()
     plt.savefig("PRvsPRER.png")
     plt.show()
-
-
 
 def main():
     tcga_example()
