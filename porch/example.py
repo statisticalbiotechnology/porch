@@ -156,9 +156,10 @@ def tcga_example():
     sns.set_palette("bright")
     tripple_neg = (brca_clin.T["PR"] == 0) & (brca_clin.T["ER"] == 0) & (brca_clin.T["HER2"] == 0)
     runx1 = activity.loc["R-HSA-8931987",:].T
+    hist, bin_edges = np.histogram(runx1,40)
     fig = plt.figure(figsize=(10,6))
-    sns.distplot(runx1[tripple_neg], kde=False,norm_hist=True, color="red")
-    sns.distplot(runx1[~tripple_neg], kde=False,norm_hist=True, color="blue")
+    sns.distplot(runx1[tripple_neg], bins=bin_edges, kde=False,norm_hist=True, color="red")
+    sns.distplot(runx1[~tripple_neg], bins=bin_edges, kde=False,norm_hist=True, color="blue")
     plt.legend(labels=['TNBC','Non-TNBC'],loc='upper right')
     plt.ylabel('Density')
     plt.xlabel('Activity of \"RUNX1 regulates estrogen receptor mediated transcription\"')
