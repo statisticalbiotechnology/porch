@@ -15,11 +15,11 @@ def porch_single_process(expression_df, phenotype_df, geneset_df,
     gene_column = "gene", set_column = "pathway",
     test = "Pathway ~ C(Case)"):
     """
-    This is a the central routine of porch. It calculates pathway activities from the expression values of analytes,
+    This is the central routine of porch. It calculates pathway activities from the expression values of analytes,
     with a grouping given by a pathway definition. If so specified, it tests the pathway activities with a set of tests specified by the user
 
     Args:
-        expression_df (pd.DataFrame): The DataFrame of the expression values we analyse. These values are logtransformed and subsequently standardized befor analysis
+        expression_df (pd.DataFrame): The DataFrame of the expression values we analyse. These values are logtransformed and subsequently standardized before analysis
         phenotype_df (pd.DataFrame): The DataFrame of the phenotypic variables of each sample, that we want to test against.
         geneset_df (pd.DataFrame): The DataFrame of the pathway definitions.
         gene_column (str): The name of the column within geneset_df containing names of analytes.
@@ -59,7 +59,7 @@ def porch(expression_df, phenotype_df, geneset_df,
     gene_column = "gene", set_column = "pathway",
     test = "Pathway ~ C(Case)"):
     """
-    This is a the central routine of porch. It calculates pathway activities from the expression values of analytes,
+    This is the central routine of porch. It calculates pathway activities from the expression values of analytes,
     with a grouping given by a pathway definition. If so specified, it tests the pathway activities with a set of tests specified by the user
 
     Args:
