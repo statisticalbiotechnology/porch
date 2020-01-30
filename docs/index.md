@@ -1,5 +1,5 @@
 # Porch
-![porch](img/porch.jpg "Photo (c) Sonja Lovas, https://www.flickr.com/photos/sonjalovas/4038233322 ")  
+![](img/porch.jpg "Photo (c) Sonja Lovas, https://www.flickr.com/photos/sonjalovas/4038233322 ")  
 
 A method to explore your personal pathways.  
 
