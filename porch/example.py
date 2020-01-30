@@ -149,7 +149,8 @@ def tcga_example():
         activity = activity_t.read_file()
     except Exception:
         print("Run Porch ...")
-        significance,activity,untested = porch.porch_reactome(brca,brca_clin,"HSA","Pathway ~ C(PR) + C(ER) + C(PR):C(ER)")
+        activity,untested = porch.porch_reactome(brca)
+        significance = porch.linear_model("Pathway ~ C(PR) + C(ER) + C(PR):C(ER)", activity, brca_clin)
         significance_t.write_file(significance.T)
         activity_t.write_file(activity)
     ## Plot the activity of R-HSA-8931987 in TNBC vs non-TNBC
