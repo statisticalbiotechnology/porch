@@ -161,7 +161,7 @@ def applicable_linear_model(row,test,phenotype_df):
 
 
 def download_file(path, url):
-    "This function downloads a file, path, from an url, if the file is not already cashed"
+    "This function downloads a file, path, from an url, if the file is not already cached"
     if not os.path.isfile(path):
         stream = urllib.request.urlopen(url)
         with open(path,'wb') as output:
@@ -170,12 +170,12 @@ def download_file(path, url):
 
 reactome_fn = "2Reactome_All_Levels.txt"
 #reactome_fn = "UniProt2Reactome_All_Levels.txt"
-cashe_path = ".porch"
+cache_path = ".porch"
 reactome_url = "https://reactome.org/download/current/"
 
 def get_reactome_df(organism = "HSA", gene_anot = "Ensembl"):
     fn = gene_anot + reactome_fn
-    path = os.path.join(cashe_path,fn)
+    path = os.path.join(cache_path,fn)
     url = reactome_url + fn
     reactome_df = pd.read_csv(download_file(path, url),
                         sep='\t',
@@ -185,3 +185,20 @@ def get_reactome_df(organism = "HSA", gene_anot = "Ensembl"):
     organism = "R-" + organism
     reactome_df = reactome_df[reactome_df["reactome_id"].str.startswith(organism) ]
     return reactome_df
+
+def read_triqler(file_name):
+    """Code for reading a protein.tsv file from triqler"""
+    pid_col, first_dat_col = 2, 7
+    proteins, data = [], []
+    with open(file_name) as infile:
+        header = infile.readline().split('\t')
+        last_dat_col = len(header) - 1
+        col_names = [w.split(':')[2] for w in header[first_dat_col:last_dat_col]]
+        phen_values = [[int(w.split(':')[0]) for w in header[first_dat_col:last_dat_col]]]
+        for line in infile.readlines():
+            words = line.split('\t')
+            proteins += [words[pid_col]]
+            data += [[np.exp2(float (w)) for w in words[first_dat_col:last_dat_col]]]
+    values_df = pd.DataFrame(index=proteins, columns=col_names, data=data)
+    phenotype_df = pd.DataFrame(index=["SampleGroup"], columns=col_names, data=phen_values)
+    return values_df, phenotype_df

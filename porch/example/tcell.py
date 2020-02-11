@@ -7,9 +7,9 @@ import requests
 import os
 from biothings_client import get_client
 import porch
-import qvalue as qv
+import porch.qvalue as qv
 
-cashe_directory = ".porch"
+cache_directory = ".porch"
 protein_expression_name = "tcell_protein"
 preprcoc_prefix = "proc_"
 significance_name  = "significance"
@@ -17,7 +17,7 @@ activity_name = "activity"
 
 proteomics_data_url = "https://ars.els-cdn.com/content/image/1-s2.0-S0092867416313137-mmc1.xlsx"
 
-class FileCashe:
+class FileCache:
     def __init__(self, file_name):
         self.file_name = file_name
 
@@ -25,7 +25,7 @@ class FileCashe:
         return self.file_name
 
 
-class UrlFileCashe(FileCashe):
+class UrlFileCache(FileCache):
     def __init__(self, file_name, url):
         self.file_name = file_name
         self.url = url
@@ -41,7 +41,7 @@ class UrlFileCashe(FileCashe):
             self.track_dl()
         return self.file_name
 
-class TsvFileTracker(FileCashe):
+class TsvFileTracker(FileCache):
     def __init__(self, file_name, filler):
         self.file_name = file_name
         self.filler = filler
@@ -71,22 +71,23 @@ def one_row_per_proteoform(group):
     return pd.DataFrame(content)
 
 def tcell_read_proteomics_data():
-    """This function is quite convoluted as it downloads one tarfile and extracts two dataframes. The function also cashes intermediate files"""
+    """This function is quite convoluted as it downloads one tarfile and extracts two dataframes. The function also caches intermediate files"""
 
-    tcell_prot_xls = UrlFileCashe(os.path.join(cashe_directory,  protein_expression_name + ".xlsx"),proteomics_data_url)
+    tcell_prot_xls = UrlFileCache(os.path.join(cache_directory,  protein_expression_name + ".xlsx"),proteomics_data_url)
     proteomics_df = pd.read_excel(tcell_prot_xls.get_file_name(), sheet_name = "Data", index_col=0, usecols="A,D:U")
 #    proteomics_df = pd.read_excel(tcell_prot_xls.get_file_name(), sheet_name = "Data", index_col=0, usecols="A,V:AM")
+    proteomics_df = proteomics_df - proteomics_df.mean()    # Normalize by subtracting column mean
+    proteomics_df = proteomics_df.apply(np.exp2)    # The excel data is in log2 space, return it to normal
     proteomics_df = proteomics_df.groupby("Protein IDs", group_keys=False).apply(one_row_per_proteoform).reset_index(drop=True)
     proteomics_df.set_index("ProteinID", inplace=True)
-    proteomics_df.apply(np.exp2, inplace=True)    # The excel data is in log2 space, return it to normal
     return proteomics_df
 
 def tcell_read_data():
     try:
-        os.mkdir(cashe_directory)
+        os.mkdir(cache_directory)
     except FileExistsError:
         pass
-    proc_tcell_t = TsvFileTracker(os.path.join(cashe_directory, protein_expression_name + ".tsv.gz"),tcell_read_proteomics_data)
+    proc_tcell_t = TsvFileTracker(os.path.join(cache_directory, protein_expression_name + ".tsv.gz"),tcell_read_proteomics_data)
     proteomics_df = proc_tcell_t.read_file()
     phenotype_df = pd.DataFrame(columns=proteomics_df.columns, data=[[0]*7+[12]*3+[24]+[48]*2+[72]*3+[96]*2], index=["Time"])
     return phenotype_df, proteomics_df
@@ -105,9 +106,6 @@ def tcell_example():
     fig = plt.figure(figsize=(10,6))
     significance["-log10(q)"] = -np.log10(significance["q_value_Time"])
     g = sns.distplot(significance["-log10(q)"], rug=True, kde=False)
-#   g.set_xscale('log')
-#    g.set_xlim(10e-80,0.5)
-#    g.set_ylim(10e-50,0.5)
     plt.savefig("tcell-qtime.png")
     plt.show()
     significance.sort_values(by=['q_value_Time'], inplace=True, ascending=True)
