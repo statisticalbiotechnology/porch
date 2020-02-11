@@ -116,7 +116,7 @@ def tcga_preprocess(brca, brca_clin):
     return brca, brca_clin
 
 def tcga_read_data():
-    """This functtion is quite convoluted as it downloads one tarfile and extracts two dataframes. The function also cashes intermediate files"""
+    """This function is quite convoluted as it downloads one tarfile and extracts two dataframes. The function also cashes intermediate files"""
     print("Downloading data ...")
     try:
         os.mkdir(cashe_directory)
