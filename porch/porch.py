@@ -29,7 +29,7 @@ def porch_single_process(expression_df, geneset_df, gene_column = "gene", set_co
         A pandas DataFrames activity_df, containing the pathway activity values for each sample and pathway.
         untested, a list of the pathway that were not possible to decompose, due to shortage of data in expression_df.
     """
-    expression_df = expression_df[phenotype_df.columns]
+    # expression_df = expression_df[phenotype_df.columns]
     results_df = pd.DataFrame()
     set_df = geneset_df[[gene_column, set_column]]
     set_of_all_genes = set(expression_df.index)
@@ -38,11 +38,12 @@ def porch_single_process(expression_df, geneset_df, gene_column = "gene", set_co
         genes = list(set(geneset[gene_column].tolist()) & set_of_all_genes)
         proc = porch_proc
         setname, activity = proc(setname, genes, expression_df)
-        if result:
+        if activity is None:
+            untested += [setname]
+        else:
             setnames += [setname]
             activities += [activity]
-        else:
-            untested += [setname]
+
     activity_df = pd.DataFrame(data=activities, columns=expression_df.columns, index=setnames)
     return activity_df, untested
 
@@ -85,7 +86,7 @@ def porch(expression_df, geneset_df,
 
 def porch_proc(setname, genes, expression_df,keep_feature_stdv=True):
     """ Core processing node of porch. Takes the analysis from expression values to significance testing. """
-#    print("Decomposing " + setname, file=sys.stderr)
+    print("Decomposing " + setname, file=sys.stderr)
     expr = expression_df.loc[genes]
     expr.dropna(axis=0, how='any', inplace=True)
     expr = expr.loc[~(expr<=0.0).any(axis=1)]
