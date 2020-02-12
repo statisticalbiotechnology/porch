@@ -12,8 +12,7 @@ import os.path
 import sys
 
 
-def porch_single_process(expression_df, geneset_df,
-    gene_column = "gene", set_column = "pathway"):
+def porch_single_process(expression_df, geneset_df, gene_column = "gene", set_column = "pathway"):
     """
     Calculates pathway activities from the expression values of analytes,
     with a grouping given by a pathway definition.
@@ -26,30 +25,26 @@ def porch_single_process(expression_df, geneset_df,
         set_column (str): The name of the column within geneset_df containing names of pathways.
 
     Returns:
-        results_df, untested
-        A pandas DataFrames results_df, containing the output of the significance tests
-        untested, a list of the pathway that were not possible to test, due to shortage of data in expression_df.
+        activity_df, untested
+        A pandas DataFrames activity_df, containing the pathway activity values for each sample and pathway.
+        untested, a list of the pathway that were not possible to decompose, due to shortage of data in expression_df.
     """
     expression_df = expression_df[phenotype_df.columns]
     results_df = pd.DataFrame()
     set_df = geneset_df[[gene_column, set_column]]
     set_of_all_genes = set(expression_df.index)
-    results, setnames, untested, activities, tested_vars = [], [], [], [], None
+    setnames, untested, activities = [], [], []
     for setname, geneset in set_df.groupby([set_column]):
         genes = list(set(geneset[gene_column].tolist()) & set_of_all_genes)
         proc = porch_proc
-        setname, result, activity, variables = proc(setname, genes, expression_df)
+        setname, activity = proc(setname, genes, expression_df)
         if result:
-            results += [result]
             setnames += [setname]
             activities += [activity]
-            if not tested_vars:
-                tested_vars = variables
         else:
             untested += [setname]
-    results_df = pd.DataFrame(data=results, columns=tested_vars,index=setnames)
     activity_df = pd.DataFrame(data=activities, columns=expression_df.columns, index=setnames)
-    return results_df, activity_df, untested
+    return activity_df, untested
 
 
 def porch(expression_df, geneset_df,
