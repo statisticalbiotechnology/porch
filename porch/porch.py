@@ -36,8 +36,7 @@ def porch_single_process(expression_df, geneset_df, gene_column = "gene", set_co
     setnames, untested, activities = [], [], []
     for setname, geneset in set_df.groupby([set_column]):
         genes = list(set(geneset[gene_column].tolist()) & set_of_all_genes)
-        proc = porch_proc
-        setname, activity = proc(setname, genes, expression_df)
+        setname, activity = poch_proc(setname, genes, expression_df)
         if activity is None:
             untested += [setname]
         else:
