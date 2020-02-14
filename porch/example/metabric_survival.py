@@ -4,7 +4,7 @@ import porch
 from lifelines import CoxPHFitter
 
 
-def load_metabric(path = metabric_path, relevant_columns = ['METABRIC_ID', 'age_at_diagnosis', 'last_follow_up_status','Treatment','T', 'Pam50Subtype', 'ER.Expr', 'Her2.Expr', 'PR.Expr']):
+def load_metabric(path, relevant_columns = ['METABRIC_ID', 'age_at_diagnosis', 'last_follow_up_status','Treatment','T', 'Pam50Subtype', 'ER.Expr', 'Her2.Expr', 'PR.Expr']):
      
     discovery_ex_path = path + '/discovery_ExpressionMatrix.txt'
     validation_ex_path = path + '/validation_ExpressionMatrix.txt'
@@ -32,7 +32,7 @@ def load_metabric(path = metabric_path, relevant_columns = ['METABRIC_ID', 'age_
      
     return data
 
-def illumina2ensembl_dictionary(path = illumina2ensembl_path):
+def illumina2ensembl_dictionary(path):
     """
     This function needs a file with Illumina probe IDs and Ensembl IDs downloaded from Biomart
     """
@@ -64,14 +64,16 @@ def metabric_survival(activity_df, metadata_df):
 
 
 if __name__ == "__main__":
-    metabric_path = '../../../data/metabric'
-    illumina2ensembl_path = '../../../data/reactome/illumina2ensembl.txt'
+    metabric_path = '../../../../data/metabric'
+    illumina2ensembl_path = '../../../../data/reactome/illumina2ensembl.txt'
     
-    data = load_metabric(metabric_path)
+    data = load_metabric(metabric_path )
     expression_df = data.iloc[8:,:]
     metadata_df = data.iloc[:8,:]
 
-    activity = porch_metabric(expression_df,  illumina2ensembl_path = illumina2ensembl_path)
+    activity = porch_metabric(expression_df,  illumina2ensembl_path)
+    activity.to_csv('metabric_activities.csv')
     results = metabric_survival(activity, metadata_df)
+    results.to_csv('metabric_results.csv')
 
 
