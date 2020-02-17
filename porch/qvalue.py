@@ -38,7 +38,7 @@ def estimatePi0(p, numBoot=100, numLambda=100, maxLambda=0.95):
     minIx = np.argmin(mse)
     return pi0s[minIx]
 
-def qvalues(pvalues,p_col = "p", q_col ="q"):
+def qvalues(pvalues,p_col = "p", q_col ="q", pi0 = 1.0):
     """
     Function for estimaring q values.
 
@@ -46,14 +46,17 @@ def qvalues(pvalues,p_col = "p", q_col ="q"):
         pvalues (DataFrame): A DataFrame that contain at least one column with pvalues.
         p_col (str): The name of the column that contain pvalues.
         q_col (str): The name of the column that that shall contain the estimated
-                     q-values. The column will be created if not already existing.
+                    q-values. The column will be created if not already existing.
+        pi0 (float): The prior probability of the null hypothesis. If set to None, this is estimated from data.
+                    Defaults to 1.0
 
     Returns:
         The modified DataFrame.
     """
     m = pvalues.shape[0] # The number of p-values
     pvalues.sort_values(p_col,inplace=True) # sort the pvalues in acending order
-    pi0 = estimatePi0(list(pvalues[p_col].values))
+    if pi0 is None:
+        pi0 = estimatePi0(list(pvalues[p_col].values))
 
     # calculate a FDR(t) as in Storey & Tibshirani
     num_p = 0.0

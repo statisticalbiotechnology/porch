@@ -7,9 +7,9 @@ import requests
 import os
 from biothings_client import get_client
 import porch
-import qvalue as qv
+import porch.qvalue as qv
 
-cashe_directory = ".porch"
+cache_directory = ".porch"
 expression_name = "brca"
 phenotype_name = "brca_clin"
 preprcoc_prefix = "proc_"
@@ -37,9 +37,9 @@ class FileTracker:
 
 
 class TarTracker(FileTracker):
-    def __init__(self, url,cashe_dir = ".porch", tar_name = "my.tar.gz"):
-        self.file_name = os.path.join(cashe_dir,tar_name)
-        self.cashe_dir = cashe_dir
+    def __init__(self, url,cache_dir = ".porch", tar_name = "my.tar.gz"):
+        self.file_name = os.path.join(cache_dir,tar_name)
+        self.cache_dir = cache_dir
         self.url = url
 
     def get_handle_for_tar(self):
@@ -55,8 +55,8 @@ class TarTracker(FileTracker):
             df = pd.read_csv(path, sep="\t",index_col=0)
         except:
             tf = self.get_handle_for_tar()
-            tf.extract(file,self.cashe_dir )
-            df = pd.read_csv(os.path.join(self.cashe_dir, file), sep="\t")
+            tf.extract(file,self.cache_dir )
+            df = pd.read_csv(os.path.join(self.cache_dir, file), sep="\t")
             df.to_csv(path, sep="\t")
         return df
 
@@ -105,7 +105,6 @@ def tcga_preprocess(brca, brca_clin):
     brca.rename(index=entrez2ensembl, inplace=True)
     #brca.index =  brca.index.map(str)
     #brca = pd.DataFrame(data=np.log2(brca.values), index=brca.index, columns=brca.columns)
-    brca = pd.DataFrame(data=np.log2(brca.values), index=brca.index, columns=brca.columns)
     brca_clin = brca_clin.loc[["PR status by ihc","ER Status By IHC","IHC-HER2"]].rename(index={"PR status by ihc" : "PR","ER Status By IHC":"ER","IHC-HER2":"HER2"})
     relevant_col = brca_clin.T["PR"].isin(['Negative', 'Positive']) & brca_clin.T["ER"].isin(['Negative', 'Positive']) & brca_clin.T["HER2"].isin(['Negative', 'Positive'])
     brca_clin = brca_clin.T[relevant_col].T
@@ -116,18 +115,18 @@ def tcga_preprocess(brca, brca_clin):
     return brca, brca_clin
 
 def tcga_read_data():
-    """This functtion is quite convoluted as it downloads one tarfile and extracts two dataframes. The function also cashes intermediate files"""
+    """This function is quite convoluted as it downloads one tarfile and extracts two dataframes. The function also caches intermediate files"""
     print("Downloading data ...")
     try:
-        os.mkdir(cashe_directory)
+        os.mkdir(cache_directory)
     except FileExistsError:
         pass
 
-    brca_path= os.path.join(cashe_directory,  expression_name + ".tsv.gz")
-    brca_clin_path = os.path.join(cashe_directory,  phenotype_name + ".tsv.gz")
-    proc_brca_t = FileTracker(os.path.join(cashe_directory,  preprcoc_prefix + expression_name + ".tsv.gz"))
-    proc_brca_clin_t = FileTracker(os.path.join(cashe_directory,  preprcoc_prefix + phenotype_name + ".tsv.gz"))
-    tcga = TcgaTracker('http://download.cbioportal.org/brca_tcga_pub2015.tar.gz', cashe_directory, "my.tar.gz")
+    brca_path= os.path.join(cache_directory,  expression_name + ".tsv.gz")
+    brca_clin_path = os.path.join(cache_directory,  phenotype_name + ".tsv.gz")
+    proc_brca_t = FileTracker(os.path.join(cache_directory,  preprcoc_prefix + expression_name + ".tsv.gz"))
+    proc_brca_clin_t = FileTracker(os.path.join(cache_directory,  preprcoc_prefix + phenotype_name + ".tsv.gz"))
+    tcga = TcgaTracker('http://download.cbioportal.org/brca_tcga_pub2015.tar.gz', cache_directory, "my.tar.gz")
     try:
         brca = proc_brca_t.read_file()
         brca_clin = proc_brca_clin_t.read_file()
@@ -142,8 +141,8 @@ def tcga_read_data():
 
 def tcga_example():
     brca, brca_clin = tcga_read_data()
-    significance_t  = FileTracker(os.path.join(cashe_directory,  significance_name + ".tsv"))
-    activity_t = FileTracker(os.path.join(cashe_directory,  activity_name + ".tsv"))
+    significance_t  = FileTracker(os.path.join(cache_directory,  significance_name + ".tsv"))
+    activity_t = FileTracker(os.path.join(cache_directory,  activity_name + ".tsv"))
     try:
         significance = significance_t.read_file().T
         activity = activity_t.read_file()
