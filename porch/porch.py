@@ -20,7 +20,7 @@ def porch_single_process(expression_df, geneset_df,
     This call is not using parallel processing, mostly for debugging purposes.
 
     Args:
-        expression_df (pd.DataFrame): The DataFrame of the expression values we analyse. These values are logtransformed and subsequently standardized befor analysis
+        expression_df (pd.DataFrame): The DataFrame of the expression values we analyse. These values are logtransformed and subsequently standardized before analysis
         geneset_df (pd.DataFrame): The DataFrame of the pathway definitions.
         gene_column (str): The name of the column within geneset_df containing names of analytes.
         set_column (str): The name of the column within geneset_df containing names of pathways.
