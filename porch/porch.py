@@ -10,6 +10,8 @@ from wpca import WPCA
 import urllib.request
 import os.path
 import sys
+import patsy
+from lifelines import CoxPHFitter
 
 
 def porch_single_process(expression_df, geneset_df, gene_column = "gene", set_column = "pathway"):
@@ -36,7 +38,7 @@ def porch_single_process(expression_df, geneset_df, gene_column = "gene", set_co
     setnames, untested, activities = [], [], []
     for setname, geneset in set_df.groupby([set_column]):
         genes = list(set(geneset[gene_column].tolist()) & set_of_all_genes)
-        setname, activity = poch_proc(setname, genes, expression_df)
+        setname, activity = porch_proc(setname, genes, expression_df)
         if activity is None:
             untested += [setname]
         else:
@@ -197,3 +199,34 @@ def read_triqler(file_name):
     values_df = pd.DataFrame(index=proteins, columns=col_names, data=data)
     phenotype_df = pd.DataFrame(index=["SampleGroup"], columns=col_names, data=phen_values)
     return values_df, phenotype_df
+
+def survival(row, phenotype_df, duration_col = 'T', event_col = 'E', other_cols = []):
+    """
+    duration_col: survival time
+    event_col: whether an event (death or other) has ocured or not. 0 for no, 1 for yes
+    other_cols: other variables to consider in the regression
+    """
+    phenotype_df = phenotype_df.T 
+    phenotype_df = phenotype_df.join(row.astype(float))
+    phenotype_df[duration_col] = phenotype_df[duration_col].astype(float) 
+    phenotype_df[event_col] = phenotype_df[event_col].astype(int) 
+    
+    # The following lines deal with char conflicts in patsy formulas
+    duration_col = duration_col.replace(' ','_').replace('.','_').replace('-','_')   
+    event_col = event_col.replace(' ','_').replace('.','_').replace('-','_')
+    other_cols = [x.replace(' ','_').replace('.','_').replace('-','_') for x in other_cols]
+    row.name = row.name.replace(' ','_').replace('.','_').replace('-','_')   
+    phenotype_df.columns = [x.replace(' ','_').replace('.','_').replace('-','_') for x in phenotype_df.columns]
+    
+    formula = row.name + ' + ' + duration_col + ' + ' + event_col
+    if not not other_cols:
+        other_cols = [x.replace(' ','_').replace('.','_') for x in other_cols]
+        formula = formula + ' + ' + ' + '.join(other_cols) 
+    X = patsy.dmatrix(formula_like = formula, data = phenotype_df, return_type = 'dataframe')
+    X = X.drop(['Intercept'], axis = 1)
+    cph = CoxPHFitter()
+    cph.fit(X, duration_col = duration_col, event_col = event_col)
+    result = cph.summary.loc[row.name]
+    return result
+
+
