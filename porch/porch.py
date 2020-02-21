@@ -107,7 +107,7 @@ def porch_reactome(expression_df, organism = "HSA", gene_anot = "Ensembl"):
         "gene", "reactome_id")
 
 def wpca_decomposition(data):
-    weights = 1.0 - np.isnan(data)
+    weights = 0. + np.isfinite(data)
     kwds = {'weights': weights}
     pca = WPCA(n_components=1).fit(data, **kwds)
     eigen_samples = pca.transform(data)[:,0]
