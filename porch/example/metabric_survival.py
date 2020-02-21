@@ -50,17 +50,15 @@ def porch_metabric(expression_df, illumina2ensembl_path = '../../../data/reactom
     return activity
 
 def metabric_survival(activity_df, metadata_df):
+    metadata_df.loc['E'] = (metadata_df.loc['last_follow_up_status'] == 'd-d.s.')*1
     result = pd.DataFrame()
-    for pathway in activity_df.index:
-        print('Cox regression: ' + str(pathway))
-        cph = CoxPHFitter()
-        subdata_df = metadata_df.loc[['T']]
-        subdata_df = subdata_df.append((metadata_df.loc['last_follow_up_status'] == 'd-d.s.')*1)
-        subdata_df = subdata_df.append(activity_df.loc[pathway]).T
-        subdata_df = subdata_df.dropna()
-        cph.fit(subdata_df, duration_col = 'T', event_col = 'last_follow_up_status')
-        result = result.append(cph.summary)
+    for index, row in activity_df.iterrows():
+        print("Cox's regression: " + str(index))
+        rowresult = porch.survival(row, metadata_df, duration_col = 'T', event_col = 'E')
+        result = result.append(rowresult)
     return result
+
+
 
 
 if __name__ == "__main__":
@@ -72,8 +70,10 @@ if __name__ == "__main__":
     metadata_df = data.iloc[:8,:]
 
     activity = porch_metabric(expression_df,  illumina2ensembl_path)
+    print('Writing metabric_activities.csv')
     activity.to_csv('metabric_activities.csv')
     results = metabric_survival(activity, metadata_df)
+    print('Writing metabric_results.csv')
     results.to_csv('metabric_results.csv')
 
 
