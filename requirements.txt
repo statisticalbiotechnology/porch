@@ -5,3 +5,6 @@ scikit-learn
 requests
 biothings_client
 seaborn
+scipy
+wpca
+lifelines>=0.24
