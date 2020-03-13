@@ -96,6 +96,7 @@ def porch_proc(setname, genes, expression_df,keep_feature_stdv=True):
         log_data = np.log(expr.values.T.astype(float))
         standard_log_data = standardizer.fit_transform(log_data).T
         eigen_genes, _ = decomposition_method(standard_log_data)
+#        print("Done " + setname, file=sys.stderr)
         return setname, eigen_genes
     else:
 #        print("Not enough data to evaluate " + setname, file=sys.stderr)
@@ -107,6 +108,19 @@ def porch_reactome(expression_df, organism = "HSA", gene_anot = "Ensembl"):
 #    return porch_single_process(expression_df, reactome_df, "gene", "reactome_id")
     return porch(expression_df, reactome_df,
         "gene", "reactome_id")
+
+def porch_multi_reactome(expression_df,list_of_expression_annotations):
+    "Download the Reactome database and subsequently call porch"
+    reactome_df = None
+    for organism, gene_anot in list_of_expression_annotations:
+        r_df = get_reactome_df(organism, gene_anot)
+        if reactome_df is None:
+            reactome_df = r_df
+        else:
+            reactome_df.append(r_df)
+    return porch_single_process(expression_df, reactome_df, "gene", "reactome_id")
+#    return porch(expression_df, reactome_df,
+#        "gene", "reactome_id")
 
 def wpca_decomposition(data):
     weights = 0. + np.isfinite(data)
@@ -122,8 +136,8 @@ def svd_decomposition(data):
     eigen_samples = U[:,0]
     return eigen_genes, eigen_samples
 
-#decomposition_method = svd_decomposition
-decomposition_method = wpca_decomposition
+decomposition_method = svd_decomposition
+#decomposition_method = wpca_decomposition
 
 def linear_model(test,activity_df,phenotype_df):
     """
@@ -206,27 +220,25 @@ def survival(row, phenotype_df, duration_col = 'T', event_col = 'E', other_cols 
     event_col: whether an event (death or other) has ocured or not. 0 for no, 1 for yes
     other_cols: other variables to consider in the regression
     """
-    phenotype_df = phenotype_df.T 
+    phenotype_df = phenotype_df.T
     phenotype_df = phenotype_df.join(row.astype(float))
-    phenotype_df[duration_col] = phenotype_df[duration_col].astype(float) 
-    phenotype_df[event_col] = phenotype_df[event_col].astype(int) 
-    
+    phenotype_df[duration_col] = phenotype_df[duration_col].astype(float)
+    phenotype_df[event_col] = phenotype_df[event_col].astype(int)
+
     # The following lines deal with char conflicts in patsy formulas
-    duration_col = duration_col.replace(' ','_').replace('.','_').replace('-','_')   
+    duration_col = duration_col.replace(' ','_').replace('.','_').replace('-','_')
     event_col = event_col.replace(' ','_').replace('.','_').replace('-','_')
     other_cols = [x.replace(' ','_').replace('.','_').replace('-','_') for x in other_cols]
-    row.name = row.name.replace(' ','_').replace('.','_').replace('-','_')   
+    row.name = row.name.replace(' ','_').replace('.','_').replace('-','_')
     phenotype_df.columns = [x.replace(' ','_').replace('.','_').replace('-','_') for x in phenotype_df.columns]
-    
+
     formula = row.name + ' + ' + duration_col + ' + ' + event_col
     if not not other_cols:
         other_cols = [x.replace(' ','_').replace('.','_') for x in other_cols]
-        formula = formula + ' + ' + ' + '.join(other_cols) 
+        formula = formula + ' + ' + ' + '.join(other_cols)
     X = patsy.dmatrix(formula_like = formula, data = phenotype_df, return_type = 'dataframe')
     X = X.drop(['Intercept'], axis = 1)
     cph = CoxPHFitter()
     cph.fit(X, duration_col = duration_col, event_col = event_col)
     result = cph.summary.loc[row.name]
     return result
-
-

@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import seaborn as sns
+import scipy.stats
 import numpy as np
 import pandas as pd
 import tarfile
@@ -95,6 +96,13 @@ def tcell_read_metabolomics_data():
     """This function is quite convoluted as it downloads an excelfile from a publication and extracts a dataframe, idexed by chebi. The function also caches intermediate files"""
     tcell_metabol_xls = UrlFileCache(os.path.join(cache_directory,  metabolite_expression_name + ".xlsx"), metabolomics_data_url)
     metabolomics_df = pd.read_excel(tcell_metabol_xls.get_file_name(), sheet_name = "normalized by sample mean", index_col=0, usecols="A,C:HN", skiprows = [0])
+    #metabolomics_df = pd.read_excel(tcell_metabol_xls.get_file_name(), sheet_name = "normalized by sample mean", index_col=0, usecols="A,C:HN", skiprows = [0])
+    for col in metabolomics_df.columns:
+        # Average all technical replicates (Named by trailing ".1")
+        if len(col.split('.'))>1 and col.split('.')[1] == "1":
+            remcol = col.split('.')[0]
+            metabolomics_df[remcol] = scipy.stats.gmean(metabolomics_df[[remcol,col]],axis=1)
+            metabolomics_df.drop(col, axis=1, inplace=True)
     metabolomics_df.index.name = "KEGG_ID"
     metabolomics_df = metabolomics_df.apply(np.exp2)    # The excel data is in log2 space, return it to normal
     k = KEGG(verbose=False)
@@ -110,29 +118,34 @@ def tcell_read_metabolomics_frames():
         pass
     proc_tcell_t = TsvFileTracker(os.path.join(cache_directory, metabolite_expression_name + ".tsv.gz"), tcell_read_metabolomics_data)
     metabolomics_df = proc_tcell_t.read_file()
-    values = []
+    values,cols = [],[]
     for coln in metabolomics_df.columns:
         if "non act" in coln:
-            values += [-1.]
+            time = -1.
         elif "ON" in coln:
-            values += [0.]
+            time = 0.
         elif "act 3h" in coln:
-            values += [3.]
+            time = 3.
         elif "act 12h" in coln:
-            values += [12.]
+            time = 12.
         elif "act 14h" in coln:
-            values += [12.]
+            time = 14.
         elif "act 24h" in coln:
-            values += [24.]
+            time = 24.
         elif "act 2d" in coln:
-            values += [48.]
+            time = 48.
         elif "act 3d" in coln:
-            values += [72.]
+            time = 72.
         elif "act 4d" in coln:
-            values += [96.]
+            time = 96.
         else:
             print(coln)
-    phenotype_df = pd.DataFrame(columns=metabolomics_df.columns, data=[values], index=["Time"])
+        dish = coln.split('-')[0]
+        rep = coln.split('-')[2].replace(" ","")
+        values += [time]
+        cols += ['_'.join([dish,str(int(time)),rep])]
+    phenotype_df = pd.DataFrame(columns=cols, data=[values], index=["Time"])
+    metabolomics_df.columns = cols
     return phenotype_df, metabolomics_df
 
 
@@ -155,14 +168,50 @@ def tcell_read_proteomics_frames():
         pass
     proc_tcell_t = TsvFileTracker(os.path.join(cache_directory, protein_expression_name + ".tsv.gz"),tcell_read_proteomics_data)
     proteomics_df = proc_tcell_t.read_file()
-    phenotype_df = pd.DataFrame(columns=proteomics_df.columns, data=[[0]*7+[12]*3+[24]+[48]*2+[72]*3+[96]*2], index=["Time"])
+    values,cols = [],[]
+    for coln in proteomics_df.columns:
+        if "notact" in coln:
+            time = 0.
+        elif "act12h" in coln:
+            time = 12.
+        elif "act24h" in coln:
+            time = 24.
+        elif "act48h" in coln:
+            time = 48.
+        elif "act72h" in coln:
+            time = 72.
+        elif "act96h" in coln:
+            time = 96.
+        else:
+            print(coln)
+        print(coln)
+        not_sure = coln.split('_')[0].replace("q","")
+        rep = int(coln.split('_')[3].replace(" ",""))
+        if rep<18:
+            dish = int(rep/5)+2
+            rep = rep%5+1
+        elif rep<26:
+            dish = rep%3+2
+            rep = 3
+        elif rep<31:
+            dish = (rep-1)%3+2
+            rep = 3
+        else:
+            dish = (rep-2)%3+2
+            rep = 3
+        values += [time]
+        cols += ['_'.join([str(dish),str(int(time)),str(rep)])]
+    proteomics_df.columns = cols
+    phenotype_df = pd.DataFrame(columns=cols, data=[values], index=["Time"])
     return phenotype_df, proteomics_df
 
 def tcell_example():
     print("Downloading data ...")
     p_phenotype_df, proteomics_df = tcell_read_proteomics_frames()
     m_phenotype_df, metabolomics_df = tcell_read_metabolomics_frames()
-    print(proteomics_df.describe())
+    #print(proteomics_df.describe())
+    print(proteomics_df.columns)
+    print(metabolomics_df.columns)
     print("Factorize data ...")
     p_activity_df,untested = porch.porch_reactome(proteomics_df, organism = "HSA", gene_anot = "UniProt")
     print(p_activity_df)
@@ -173,6 +222,7 @@ def tcell_example():
     m_significance = porch.linear_model("Pathway ~ C(Time)", m_activity_df, m_phenotype_df)
     print("Multiple Hypothesis correction ...")
     qv.qvalues(p_significance,"C(Time)", "q_value_Time")
+    print(m_significance)
     qv.qvalues(m_significance,"C(Time)", "q_value_Time")
     fig = plt.figure(figsize=(10,6))
     p_significance["-log10(q)"] = -np.log10(p_significance["q_value_Time"])
@@ -187,23 +237,37 @@ def tcell_example():
     p_significance.sort_values(by=['q_value_Time'], inplace=True, ascending=True)
     m_significance.sort_values(by=['q_value_Time'], inplace=True, ascending=True)
     print("The most significant proteomics pathways are:")
-    print(p_significance.head(n=5))
+    print(p_significance.head(n=10))
     print("The most significant metabolomics pathways are:")
-    print(m_significance.head(n=10))
+    print(m_significance.head(n=20))
     most = p_significance.iloc[0:5:1].index
-    p_phenotype_df = p_phenotype_df.append(p_activity_df.loc[most]).T.reset_index()
-    print(p_phenotype_df)
-    out_df = pd.melt(p_phenotype_df,id_vars=["Time","index"],value_vars=most, var_name='Pathway', value_name='Activity')
+    p_joint_df = p_phenotype_df.append(p_activity_df.loc[most]).T.reset_index()
+    out_df = pd.melt(p_joint_df,id_vars=["Time","index"],value_vars=most, var_name='Pathway', value_name='Activity')
     sns.lineplot(data=out_df, x="Time", y="Activity", hue="Pathway")
     plt.savefig("p_tcell-qtime-top.png")
     plt.show()
     most = m_significance.iloc[0:10:1].index
     m_phenotype_df = m_phenotype_df.append(m_activity_df.loc[most]).T.reset_index()
-    print(m_phenotype_df)
     out_df = pd.melt(m_phenotype_df,id_vars=["Time","index"],value_vars=most, var_name='Pathway', value_name='Activity')
     sns.lineplot(data=out_df, x="Time", y="Activity", hue="Pathway")
     plt.savefig("m_tcell-qtime-top.png")
     plt.show()
+    print("MultiOmics analysis")
+    multiomics_df = pd.concat([proteomics_df,metabolomics_df],axis=0,join="inner")
+    multi_phenotype_df = p_phenotype_df[multiomics_df.columns]
+    multi_activity_df, untested = porch.porch_multi_reactome(multiomics_df,[["HSA","UniProt"], ["HSA","ChEBI"]])
+    multi_significance = porch.linear_model("Pathway ~ C(Time)", multi_activity_df, multi_phenotype_df)
+    qv.qvalues(multi_significance,"C(Time)", "q_value_Time")
+    multi_significance["-log10(q)"] = -np.log10(multi_significance["q_value_Time"])
+    print("The most significant multiomics pathways are:")
+    print(multi_significance.head(n=500))
+    for s in range(0,200,5):
+        most = multi_significance.iloc[s:s+5:1].index
+        multi_joint_df = p_phenotype_df.append(p_activity_df.loc[most]).T.reset_index()
+        out_df = pd.melt(multi_joint_df,id_vars=["Time","index"],value_vars=most, var_name='Pathway', value_name='Activity')
+        sns.lineplot(data=out_df, x="Time", y="Activity", hue="Pathway")
+        plt.savefig("multi_tcell-qtime-{}{}.png".format(s,s+5))
+        plt.show()
 
 def main():
     tcell_example()
