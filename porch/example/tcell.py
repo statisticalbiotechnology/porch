@@ -9,7 +9,7 @@ import os
 from biothings_client import get_client
 from bioservices import KEGG
 import porch
-import qvalue as qv
+import porch.qvalue as qv
 
 cache_directory = ".porch"
 protein_expression_name = "tcell_protein"
@@ -213,9 +213,9 @@ def tcell_example():
     print(proteomics_df.columns)
     print(metabolomics_df.columns)
     print("Factorize data ...")
-    p_activity_df,untested = porch.porch_reactome(proteomics_df, organism = "HSA", gene_anot = "UniProt")
+    p_activity_df, p_es, untested = porch.porch_reactome(proteomics_df, organism = "HSA", gene_anot = "UniProt")
     print(p_activity_df)
-    m_activity_df,untested = porch.porch_reactome(metabolomics_df, organism = "HSA", gene_anot = "ChEBI")
+    m_activity_df, m_es, untested = porch.porch_reactome(metabolomics_df, organism = "HSA", gene_anot = "ChEBI")
     print(m_activity_df)
     print("Significance Testing ...")
     p_significance = porch.linear_model("Pathway ~ C(Time)", p_activity_df, p_phenotype_df)
@@ -255,19 +255,21 @@ def tcell_example():
     print("MultiOmics analysis")
     multiomics_df = pd.concat([proteomics_df,metabolomics_df],axis=0,join="inner")
     multi_phenotype_df = p_phenotype_df[multiomics_df.columns]
-    multi_activity_df, untested = porch.porch_multi_reactome(multiomics_df,[["HSA","UniProt"], ["HSA","ChEBI"]])
+    multi_activity_df, multi_es, untested = porch.porch_multi_reactome(multiomics_df,[["HSA","UniProt"], ["HSA","ChEBI"]])
     multi_significance = porch.linear_model("Pathway ~ C(Time)", multi_activity_df, multi_phenotype_df)
     qv.qvalues(multi_significance,"C(Time)", "q_value_Time")
     multi_significance["-log10(q)"] = -np.log10(multi_significance["q_value_Time"])
     print("The most significant multiomics pathways are:")
     print(multi_significance.head(n=500))
-    for s in range(0,200,5):
+    for s in range(0,10,5):
         most = multi_significance.iloc[s:s+5:1].index
         multi_joint_df = p_phenotype_df.append(p_activity_df.loc[most]).T.reset_index()
         out_df = pd.melt(multi_joint_df,id_vars=["Time","index"],value_vars=most, var_name='Pathway', value_name='Activity')
         sns.lineplot(data=out_df, x="Time", y="Activity", hue="Pathway")
         plt.savefig("multi_tcell-qtime-{}{}.png".format(s,s+5))
         plt.show()
+    sorted_top = {k: v for k, v in sorted(multi_es["R-HSA-202403"].items(), key=lambda item: item[1])}
+    print(sorted_top)
 
 def main():
     tcell_example()

@@ -91,7 +91,7 @@ def porch(expression_df: pd.DataFrame,
                 setnames += [setname]
                 activities += [activity]
                 eigen_samples[setname] = eigen_sample_dict
-activity_df = pd.DataFrame(data=activities, columns=expression_df.columns, index=setnames)
+    activity_df = pd.DataFrame(data=activities, columns=expression_df.columns, index=setnames)
     return activity_df, eigen_samples, untested
 
 
@@ -110,13 +110,14 @@ def porch_proc(setname, genes, expression_df,keep_feature_stdv=True):
         return setname, eigen_genes, eigen_sample_dict
     else:
 #        print("Not enough data to evaluate " + setname, file=sys.stderr)
-        return setname, None
+        return setname, None, None
 
 def porch_reactome(expression_df: pd.DataFrame,
                                  organism: str = "HSA",
                                  gene_anot: str = "Ensembl") -> Tuple[pd.DataFrame, List]:
     """
     Download the Reactome database and subsequently call porch
+
     Args:
         expression_df (pd.DataFrame): The DataFrame of the expression values we analyse. These values are logtransformed and subsequently standardized befor analysis
         organism (str): The three letter reactome abriviation of organism, e.g. HSA or MMU
