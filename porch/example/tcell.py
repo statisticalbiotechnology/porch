@@ -8,7 +8,7 @@ import os
 from biothings_client import get_client
 from bioservices import KEGG
 import porch
-import porch.qvalue as qv
+import qvalue as qv
 
 cache_directory = ".porch"
 protein_expression_name = "tcell_protein"
@@ -173,6 +173,7 @@ def tcell_example():
     m_significance = porch.linear_model("Pathway ~ C(Time)", m_activity_df, m_phenotype_df)
     print("Multiple Hypothesis correction ...")
     qv.qvalues(p_significance,"C(Time)", "q_value_Time")
+    print(m_significance)
     qv.qvalues(m_significance,"C(Time)", "q_value_Time")
     fig = plt.figure(figsize=(10,6))
     p_significance["-log10(q)"] = -np.log10(p_significance["q_value_Time"])

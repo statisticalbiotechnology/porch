@@ -11,21 +11,15 @@ Many experiments in biology and medicine aim at detecting and quantifying differ
 Porch is a method for pathway analysis that estimates a single quantitative pathway expression value for each pathway and sample.  Our method does not only spectacularly outperform current state-of-the-art methods, like GSEA, by orders of magnitude, but we also show how our method can be combined with general linear models to test more complex relations than regular case-control scenarios.
 
 
-```eval_rst
-.. toctree::
-   :maxdepth: 2
-   :caption: Contents:
-```
-
 ## Porch API
 
 ```eval_rst
-.. automodule:: porch.porch
+.. automodule:: porch
    :members:
 ```
-## The `qvalue` submodule
+## The `qvalue` subpackage
 
 ```eval_rst
-.. automodule:: porch.qvalue
+.. automodule:: qvalue
    :members:
 ```
