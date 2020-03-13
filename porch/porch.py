@@ -103,6 +103,7 @@ def porch_proc(setname, genes, expression_df,keep_feature_stdv=True):
         log_data = np.log(expr.values.T.astype(float))
         standard_log_data = standardizer.fit_transform(log_data).T
         eigen_genes, _ = decomposition_method(standard_log_data)
+#        print("Done " + setname, file=sys.stderr)
         return setname, eigen_genes
     else:
 #        print("Not enough data to evaluate " + setname, file=sys.stderr)
@@ -114,6 +115,19 @@ def porch_reactome(expression_df, organism = "HSA", gene_anot = "Ensembl"):
 #    return porch_single_process(expression_df, reactome_df, "gene", "reactome_id")
     return porch(expression_df, reactome_df,
         "gene", "reactome_id")
+
+def porch_multi_reactome(expression_df,list_of_expression_annotations):
+    "Download the Reactome database and subsequently call porch"
+    reactome_df = None
+    for organism, gene_anot in list_of_expression_annotations:
+        r_df = get_reactome_df(organism, gene_anot)
+        if reactome_df is None:
+            reactome_df = r_df
+        else:
+            reactome_df.append(r_df)
+    return porch_single_process(expression_df, reactome_df, "gene", "reactome_id")
+#    return porch(expression_df, reactome_df,
+#        "gene", "reactome_id")
 
 def wpca_decomposition(data):
     weights = 0. + np.isfinite(data)
@@ -129,8 +143,8 @@ def svd_decomposition(data):
     eigen_samples = U[:,0]
     return eigen_genes, eigen_samples
 
-#decomposition_method = svd_decomposition
-decomposition_method = wpca_decomposition
+decomposition_method = svd_decomposition
+#decomposition_method = wpca_decomposition
 
 def linear_model(test,activity_df,phenotype_df):
     """
