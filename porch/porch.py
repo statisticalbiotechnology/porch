@@ -18,7 +18,7 @@ from typing import *
 def porch_single_process(expression_df: pd.DataFrame,
                                           geneset_df: pd.DataFrame,
                                           gene_column: str = "gene",
-                                          set_column: str = "pathway") -> Tuple[pd.DataFrame, List]:
+                                          set_column: str = "pathway") -> Tuple[pd.DataFrame, Dict[str,Dict[str,float]], List]:
     """
     Calculates pathway activities from the expression values of analytes,
     with a grouping given by a pathway definition.
@@ -40,24 +40,25 @@ def porch_single_process(expression_df: pd.DataFrame,
     results_df = pd.DataFrame()
     set_df = geneset_df[[gene_column, set_column]]
     set_of_all_genes = set(expression_df.index)
-    setnames, untested, activities = [], [], []
+    setnames, untested, activities, eigen_samples = [], [], [], {}
     for setname, geneset in set_df.groupby([set_column]):
         genes = list(set(geneset[gene_column].tolist()) & set_of_all_genes)
-        setname, activity = porch_proc(setname, genes, expression_df)
+        setname, activity, eigen_sample_dict  = porch_proc(setname, genes, expression_df)
         if activity is None:
             untested += [setname]
         else:
             setnames += [setname]
             activities += [activity]
+            eigen_samples[setname] = eigen_sample_dict
 
     activity_df = pd.DataFrame(data=activities, columns=expression_df.columns, index=setnames)
-    return activity_df, untested
+    return activity_df, eigen_samples, untested
 
 
 def porch(expression_df: pd.DataFrame,
                 geneset_df: pd.DataFrame,
                 gene_column: str = "gene",
-                set_column: str = "pathway") -> Tuple[pd.DataFrame, List]:
+                set_column: str = "pathway") -> Tuple[pd.DataFrame, Dict[str,Dict[str,float]], List]:
     """
     Calculates pathway activities from the expression values of analytes,
     with a grouping given by a pathway definition.
@@ -69,8 +70,9 @@ def porch(expression_df: pd.DataFrame,
         set_column (str): The name of the column within geneset_df containing names of pathways.
 
     Returns:
-        tuple(pd.DataFrame, list): tuple containing:
+        Tuple(pd.DataFrame, Dict[str,Dict[str,float]], list): tuple containing:
             - **activity_df** (*pd.DataFrame*): A pandas DataFrames activity_df, containing the pathway activity values for each sample and pathway.
+            - **eigen_samples** (*Dict[str,Dict[str,float]]*): A dictonary of the pathways eigen samples, i.e. represenative pattern of analyte expression values
             - **untested** (*list*): a list of the pathway that were not possible to decompose, due to shortage of data in expression_df.
     """
     set_df = geneset_df[[gene_column, set_column]]
@@ -80,16 +82,17 @@ def porch(expression_df: pd.DataFrame,
         genes = list(set(geneset[gene_column].tolist()) & set_of_all_genes)
         call_args += [(setname, genes, expression_df)]
     print("Processing with {} parallel processes".format(os.cpu_count()), file=sys.stderr)
-    setnames, untested, activities = [], [], []
+    setnames, untested, activities, eigen_samples = [], [], [], {}
     with multiprocessing.Pool() as executor:
-        for setname, activity in executor.starmap(porch_proc,  call_args):
+        for setname, activity, eigen_sample_dict in executor.starmap(porch_proc,  call_args):
             if activity is None:
                 untested += [setname]
             else:
                 setnames += [setname]
                 activities += [activity]
-    activity_df = pd.DataFrame(data=activities, columns=expression_df.columns, index=setnames)
-    return activity_df, untested
+                eigen_samples[setname] = eigen_sample_dict
+activity_df = pd.DataFrame(data=activities, columns=expression_df.columns, index=setnames)
+    return activity_df, eigen_samples, untested
 
 
 def porch_proc(setname, genes, expression_df,keep_feature_stdv=True):
@@ -102,15 +105,28 @@ def porch_proc(setname, genes, expression_df,keep_feature_stdv=True):
         standardizer = StandardScaler(with_std=keep_feature_stdv)
         log_data = np.log(expr.values.T.astype(float))
         standard_log_data = standardizer.fit_transform(log_data).T
-        eigen_genes, _ = decomposition_method(standard_log_data)
-#        print("Done " + setname, file=sys.stderr)
-        return setname, eigen_genes
+        eigen_genes, eigen_samples = decomposition_method(standard_log_data)
+        eigen_sample_dict = dict(zip(expr.index,eigen_samples))
+        return setname, eigen_genes, eigen_sample_dict
     else:
 #        print("Not enough data to evaluate " + setname, file=sys.stderr)
         return setname, None
 
-def porch_reactome(expression_df, organism = "HSA", gene_anot = "Ensembl"):
-    "Download the Reactome database and subsequently call porch"
+def porch_reactome(expression_df: pd.DataFrame,
+                                 organism: str = "HSA",
+                                 gene_anot: str = "Ensembl") -> Tuple[pd.DataFrame, List]:
+    """
+    Download the Reactome database and subsequently call porch
+    Args:
+        expression_df (pd.DataFrame): The DataFrame of the expression values we analyse. These values are logtransformed and subsequently standardized befor analysis
+        organism (str): The three letter reactome abriviation of organism, e.g. HSA or MMU
+        gene_anot (str): Reactome name of row annotation, e.g. Ensembl or ChEBI
+
+    Returns:
+        tuple(pd.DataFrame, list): tuple containing:
+            - **activity_df** (*pd.DataFrame*): A pandas DataFrames activity_df, containing the pathway activity values for each sample and pathway.
+            - **untested** (*list*): a list of the pathway that were not possible to decompose, due to shortage of data in expression_df.
+    """
     reactome_df = get_reactome_df(organism, gene_anot)
 #    return porch_single_process(expression_df, reactome_df, "gene", "reactome_id")
     return porch(expression_df, reactome_df,
