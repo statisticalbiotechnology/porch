@@ -12,13 +12,18 @@ import os.path
 import sys
 import patsy
 from lifelines import CoxPHFitter
+from typing import *
 
 
-def porch_single_process(expression_df, geneset_df, gene_column = "gene", set_column = "pathway"):
+def porch_single_process(expression_df: pd.DataFrame,
+                                          geneset_df: pd.DataFrame,
+                                          gene_column: str = "gene",
+                                          set_column: str = "pathway") -> Tuple[pd.DataFrame, Dict[str,Dict[str,float]], List]:
     """
     Calculates pathway activities from the expression values of analytes,
     with a grouping given by a pathway definition.
-    This call is not using parallel processing, mostly for debugging purposes.
+    This call is functional equivalent to the porch function, with the difference that it is not using
+    parallel processing. The function is  mostly intended for debugging purposes.
 
     Args:
         expression_df (pd.DataFrame): The DataFrame of the expression values we analyse. These values are logtransformed and subsequently standardized before analysis
@@ -27,30 +32,33 @@ def porch_single_process(expression_df, geneset_df, gene_column = "gene", set_co
         set_column (str): The name of the column within geneset_df containing names of pathways.
 
     Returns:
-        activity_df, untested
-        A pandas DataFrames activity_df, containing the pathway activity values for each sample and pathway.
-        untested, a list of the pathway that were not possible to decompose, due to shortage of data in expression_df.
+        tuple(pd.DataFrame, list): tuple containing:
+            - **activity_df** (*pd.DataFrame*): A pandas DataFrames activity_df, containing the pathway activity values for each sample and pathway.
+            - **untested** (*list*): a list of the pathway that were not possible to decompose, due to shortage of data in expression_df.
     """
     # expression_df = expression_df[phenotype_df.columns]
     results_df = pd.DataFrame()
     set_df = geneset_df[[gene_column, set_column]]
     set_of_all_genes = set(expression_df.index)
-    setnames, untested, activities = [], [], []
+    setnames, untested, activities, eigen_samples = [], [], [], {}
     for setname, geneset in set_df.groupby([set_column]):
         genes = list(set(geneset[gene_column].tolist()) & set_of_all_genes)
-        setname, activity = porch_proc(setname, genes, expression_df)
+        setname, activity, eigen_sample_dict  = porch_proc(setname, genes, expression_df)
         if activity is None:
             untested += [setname]
         else:
             setnames += [setname]
             activities += [activity]
+            eigen_samples[setname] = eigen_sample_dict
 
     activity_df = pd.DataFrame(data=activities, columns=expression_df.columns, index=setnames)
-    return activity_df, untested
+    return activity_df, eigen_samples, untested
 
 
-def porch(expression_df, geneset_df,
-    gene_column = "gene", set_column = "pathway"):
+def porch(expression_df: pd.DataFrame,
+                geneset_df: pd.DataFrame,
+                gene_column: str = "gene",
+                set_column: str = "pathway") -> Tuple[pd.DataFrame, Dict[str,Dict[str,float]], List]:
     """
     Calculates pathway activities from the expression values of analytes,
     with a grouping given by a pathway definition.
@@ -62,9 +70,10 @@ def porch(expression_df, geneset_df,
         set_column (str): The name of the column within geneset_df containing names of pathways.
 
     Returns:
-        activity_df, untested
-        A pandas DataFrames activity_df, containing the pathway activity values for each sample and pathway.
-        untested, a list of the pathway that were not possible to decompose, due to shortage of data in expression_df.
+        Tuple(pd.DataFrame, Dict[str,Dict[str,float]], list): tuple containing:
+            - **activity_df** (*pd.DataFrame*): A pandas DataFrames activity_df, containing the pathway activity values for each sample and pathway.
+            - **eigen_samples** (*Dict[str,Dict[str,float]]*): A dictonary of the pathways eigen samples, i.e. represenative pattern of analyte expression values
+            - **untested** (*list*): a list of the pathway that were not possible to decompose, due to shortage of data in expression_df.
     """
     set_df = geneset_df[[gene_column, set_column]]
     set_of_all_genes = set(expression_df.index)
@@ -73,16 +82,17 @@ def porch(expression_df, geneset_df,
         genes = list(set(geneset[gene_column].tolist()) & set_of_all_genes)
         call_args += [(setname, genes, expression_df)]
     print("Processing with {} parallel processes".format(os.cpu_count()), file=sys.stderr)
-    setnames, untested, activities = [], [], []
+    setnames, untested, activities, eigen_samples = [], [], [], {}
     with multiprocessing.Pool() as executor:
-        for setname, activity in executor.starmap(porch_proc,  call_args):
+        for setname, activity, eigen_sample_dict in executor.starmap(porch_proc,  call_args):
             if activity is None:
                 untested += [setname]
             else:
                 setnames += [setname]
                 activities += [activity]
+                eigen_samples[setname] = eigen_sample_dict
     activity_df = pd.DataFrame(data=activities, columns=expression_df.columns, index=setnames)
-    return activity_df, untested
+    return activity_df, eigen_samples, untested
 
 
 def porch_proc(setname, genes, expression_df,keep_feature_stdv=True):
@@ -95,18 +105,46 @@ def porch_proc(setname, genes, expression_df,keep_feature_stdv=True):
         standardizer = StandardScaler(with_std=keep_feature_stdv)
         log_data = np.log(expr.values.T.astype(float))
         standard_log_data = standardizer.fit_transform(log_data).T
-        eigen_genes, _ = decomposition_method(standard_log_data)
-        return setname, eigen_genes
+        eigen_genes, eigen_samples = decomposition_method(standard_log_data)
+        eigen_sample_dict = dict(zip(expr.index,eigen_samples))
+        return setname, eigen_genes, eigen_sample_dict
     else:
 #        print("Not enough data to evaluate " + setname, file=sys.stderr)
-        return setname, None
+        return setname, None, None
 
-def porch_reactome(expression_df, organism = "HSA", gene_anot = "Ensembl"):
-    "Download the Reactome database and subsequently call porch"
+def porch_reactome(expression_df: pd.DataFrame,
+                                 organism: str = "HSA",
+                                 gene_anot: str = "Ensembl") -> Tuple[pd.DataFrame, List]:
+    """
+    Download the Reactome database and subsequently call porch
+
+    Args:
+        expression_df (pd.DataFrame): The DataFrame of the expression values we analyse. These values are logtransformed and subsequently standardized befor analysis
+        organism (str): The three letter reactome abriviation of organism, e.g. HSA or MMU
+        gene_anot (str): Reactome name of row annotation, e.g. Ensembl or ChEBI
+
+    Returns:
+        tuple(pd.DataFrame, list): tuple containing:
+            - **activity_df** (*pd.DataFrame*): A pandas DataFrames activity_df, containing the pathway activity values for each sample and pathway.
+            - **untested** (*list*): a list of the pathway that were not possible to decompose, due to shortage of data in expression_df.
+    """
     reactome_df = get_reactome_df(organism, gene_anot)
 #    return porch_single_process(expression_df, reactome_df, "gene", "reactome_id")
     return porch(expression_df, reactome_df,
         "gene", "reactome_id")
+
+def porch_multi_reactome(expression_df,list_of_expression_annotations):
+    "Download the Reactome database and subsequently call porch"
+    reactome_df = None
+    for organism, gene_anot in list_of_expression_annotations:
+        r_df = get_reactome_df(organism, gene_anot)
+        if reactome_df is None:
+            reactome_df = r_df
+        else:
+            reactome_df.append(r_df)
+    return porch_single_process(expression_df, reactome_df, "gene", "reactome_id")
+#    return porch(expression_df, reactome_df,
+#        "gene", "reactome_id")
 
 def wpca_decomposition(data):
     weights = 0. + np.isfinite(data)
@@ -122,8 +160,8 @@ def svd_decomposition(data):
     eigen_samples = U[:,0]
     return eigen_genes, eigen_samples
 
-#decomposition_method = svd_decomposition
-decomposition_method = wpca_decomposition
+decomposition_method = svd_decomposition
+#decomposition_method = wpca_decomposition
 
 def linear_model(test,activity_df,phenotype_df):
     """
@@ -206,27 +244,25 @@ def survival(row, phenotype_df, duration_col = 'T', event_col = 'E', other_cols 
     event_col: whether an event (death or other) has ocured or not. 0 for no, 1 for yes
     other_cols: other variables to consider in the regression
     """
-    phenotype_df = phenotype_df.T 
+    phenotype_df = phenotype_df.T
     phenotype_df = phenotype_df.join(row.astype(float))
-    phenotype_df[duration_col] = phenotype_df[duration_col].astype(float) 
-    phenotype_df[event_col] = phenotype_df[event_col].astype(int) 
-    
+    phenotype_df[duration_col] = phenotype_df[duration_col].astype(float)
+    phenotype_df[event_col] = phenotype_df[event_col].astype(int)
+
     # The following lines deal with char conflicts in patsy formulas
-    duration_col = duration_col.replace(' ','_').replace('.','_').replace('-','_')   
+    duration_col = duration_col.replace(' ','_').replace('.','_').replace('-','_')
     event_col = event_col.replace(' ','_').replace('.','_').replace('-','_')
     other_cols = [x.replace(' ','_').replace('.','_').replace('-','_') for x in other_cols]
-    row.name = row.name.replace(' ','_').replace('.','_').replace('-','_')   
+    row.name = row.name.replace(' ','_').replace('.','_').replace('-','_')
     phenotype_df.columns = [x.replace(' ','_').replace('.','_').replace('-','_') for x in phenotype_df.columns]
-    
+
     formula = row.name + ' + ' + duration_col + ' + ' + event_col
     if not not other_cols:
         other_cols = [x.replace(' ','_').replace('.','_') for x in other_cols]
-        formula = formula + ' + ' + ' + '.join(other_cols) 
+        formula = formula + ' + ' + ' + '.join(other_cols)
     X = patsy.dmatrix(formula_like = formula, data = phenotype_df, return_type = 'dataframe')
     X = X.drop(['Intercept'], axis = 1)
     cph = CoxPHFitter()
     cph.fit(X, duration_col = duration_col, event_col = event_col)
     result = cph.summary.loc[row.name]
     return result
-
-

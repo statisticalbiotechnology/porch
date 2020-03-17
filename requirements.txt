@@ -1,7 +1,1 @@
-numpy
-pandas
-statsmodels
-scikit-learn
-requests
-biothings_client
-seaborn
+.
