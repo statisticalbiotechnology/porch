@@ -3,7 +3,7 @@ import pandas as pd
 import networkx as nx
 from networkx.readwrite import json_graph
 import json
-
+import run_server
 
 # data_path = "../../data/"
 # sub_dir = "reactome/67/"
@@ -109,4 +109,5 @@ def generate_sunburst(values_df, reactome_df, relation_file, filename, root_node
     stats_df = prepare_tree_df(values_df, reactome_df)
     json = generate_sunburst_json(stats_df, relation_file, root_node_id)
     write_json(json, filename)
+    run_server.run_sunburst(path='.')
 
