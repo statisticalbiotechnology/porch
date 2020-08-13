@@ -8,26 +8,27 @@ import run_server
 # data_path = "../../data/"
 # sub_dir = "reactome/67/"
 # relation_file = data_path + sub_dir + "ReactomePathwaysRelation.txt"
+# url_to_relation_file = "https://reactome.org/download/current/ReactomePathwaysRelation.txt"
 
-def generate_root_node(relation_file, root_node_id = 'Homo_Sapiens'):
-    
+def generate_root_node(relation_file, root_node_id = 'Homo_Sapiens', organism = "HSA"):
+
     rel_df = pd.read_csv(relation_file, sep = "\t", header = None)
-    
+
     rel_df.columns = ['parentId', 'id']
-    cut = rel_df['parentId'].str.contains('HSA') & rel_df['id'].str.contains('HSA')
+    cut = rel_df['parentId'].str.contains(organism) & rel_df['id'].str.contains(organism)
     rel_df = rel_df.loc[cut]
-    
+
     G = nx.DiGraph()
     G.add_edges_from(rel_df.values)
     roots = [n for n,d in G.in_degree() if d==0]
-    
+
     roots_df = pd.DataFrame(columns = [['parentId', 'id']])
     roots_df['id'] = roots
     roots_df['parentId'] = root_node_id
-    
+
     roots_df = pd.DataFrame(roots_df.values, columns = ['parentId', 'id'])
     rel_df = pd.DataFrame(rel_df.values, columns = ['parentId', 'id'])
-    
+
     tree = roots_df.append(rel_df)
     return tree
 
@@ -56,8 +57,8 @@ def generate_sunburst_json(stats_df, relation_file, root_node_id = 'Homo_Sapiens
     pathways = stats_df.index
     n_path = len(pathways)
 
-    subset_vec = [x in pathways for x in rel_df.iloc[:,0]] and [x in pathways for x in rel_df.iloc[:,1]] 
-    sub_rel_df = rel_df[subset_vec] 
+    subset_vec = [x in pathways for x in rel_df.iloc[:,0]] and [x in pathways for x in rel_df.iloc[:,1]]
+    sub_rel_df = rel_df[subset_vec]
 
     G = nx.DiGraph()
 
@@ -67,7 +68,7 @@ def generate_sunburst_json(stats_df, relation_file, root_node_id = 'Homo_Sapiens
     tree = nx.algorithms.dag.dag_to_branching(G)
 
     secondDict = nx.get_node_attributes(tree,'source')
-    
+
     thirdDict = {'value':{}, 'ngenes':{}, 'descr':{}}
     for key, value in secondDict.items():
         thirdDict['value'].update({key : topDict['value'][value]})
@@ -92,8 +93,6 @@ def prepare_tree_df(in_df, rectome_df):
     in_df.columns = ['value','ngenes','descr']
     return in_df
 
-
-
 def default(o):
      if isinstance(o, np.integer): return int(o)
      raise TypeError
@@ -102,12 +101,9 @@ def write_json(json, file_name):
     with open(file_name, 'w') as outfile:
         json.dump(json, outfile, default=default)
 
-
-
 def generate_sunburst(values_df, reactome_df, relation_file, filename, root_node_id = 'Homo_Sapiens'):
     # relation_file is downloaded from Reactome "ReactomePathwaysRelation.txt"
     stats_df = prepare_tree_df(values_df, reactome_df)
     json = generate_sunburst_json(stats_df, relation_file, root_node_id)
     write_json(json, filename)
     run_server.run_sunburst(path='.')
-

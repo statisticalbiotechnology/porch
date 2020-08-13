@@ -7,13 +7,13 @@ from sklearn.preprocessing import StandardScaler
 from statsmodels.formula.api import ols
 from statsmodels.stats.anova import anova_lm
 from wpca import WPCA
-import urllib.request
 import os.path
 import sys
 import patsy
 from lifelines import CoxPHFitter
 from typing import *
 
+import cache
 
 def porch_single_process(expression_df: pd.DataFrame,
                                           geneset_df: pd.DataFrame,
@@ -97,7 +97,7 @@ def porch(expression_df: pd.DataFrame,
 
 def porch_proc(setname, genes, expression_df,keep_feature_stdv=True):
     """ Core processing node of porch. Takes the analysis from expression values to significance testing. """
-    print("Decomposing " + setname, file=sys.stderr)
+    # print("Decomposing " + setname, file=sys.stderr)
     expr = expression_df.loc[genes]
     expr.dropna(axis=0, how='any', inplace=True)
     expr = expr.loc[~(expr<=0.0).any(axis=1)]
@@ -194,23 +194,13 @@ def applicable_linear_model(row,test,phenotype_df):
         pvals = None
     return pvals
 
-
-def download_file(path, url):
-    "This function downloads a file, path, from an url, if the file is not already cached"
-    if not os.path.isfile(path):
-        stream = urllib.request.urlopen(url)
-        with open(path,'wb') as output:
-            output.write(stream.read())
-    return path
-
 reactome_fn = "2Reactome_All_Levels.txt"
 #reactome_fn = "UniProt2Reactome_All_Levels.txt"
-cache_path = ".porch"
 reactome_url = "https://reactome.org/download/current/"
 
 def get_reactome_df(organism = "HSA", gene_anot = "Ensembl"):
     fn = gene_anot + reactome_fn
-    path = os.path.join(cache_path,fn)
+    path = os.path.join(cache.cache_path,fn)
     url = reactome_url + fn
     reactome_df = pd.read_csv(download_file(path, url),
                         sep='\t',
