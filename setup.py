@@ -23,6 +23,7 @@ setup(
         "scipy",
         "wpca",
         "xlrd",
+        "networkx",
         "lifelines>=0.24",
     ],
 )

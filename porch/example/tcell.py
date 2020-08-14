@@ -9,6 +9,7 @@ from bioservices import KEGG
 import porch
 import porch.qvalue as qv
 import porch.cache as cache
+import porch.sunburst.sunburst as sb
 
 # Directories and file endings for result and temporary files.
 protein_expression_name = "tcell_protein"
@@ -202,19 +203,19 @@ The example decompose the individual datasets into pathway activities, and subse
     print("The most significant metabolomics pathways are:")
     print(m_significance.head(n=20))
 
-    most = p_significance.iloc[0:5:1].index
-    p_joint_df = p_phenotype_df.append(p_activity_df.loc[most]).T.reset_index()
-    out_df = pd.melt(p_joint_df,id_vars=["Time","index"],value_vars=most, var_name='Pathway', value_name='Activity')
-    sns.lineplot(data=out_df, x="Time", y="Activity", hue="Pathway")
-    plt.savefig("p_tcell-qtime-top.png")
-    plt.show()
+#    most = p_significance.iloc[0:5:1].index
+#    p_joint_df = p_phenotype_df.append(p_activity_df.loc[most]).T.reset_index()
+#    out_df = pd.melt(p_joint_df, id_vars=["Time","index"], value_vars=most, var_name='Pathway', value_name='Activity')
+#    sns.lineplot(data=out_df, x="Time", y="Activity", hue="Pathway")
+#    plt.savefig("p_tcell-qtime-top.png")
+#    plt.show()
 
-    most = m_significance.iloc[0:10:1].index
-    m_phenotype_df = m_phenotype_df.append(m_activity_df.loc[most]).T.reset_index()
-    out_df = pd.melt(m_phenotype_df,id_vars=["Time","index"],value_vars=most, var_name='Pathway', value_name='Activity')
-    sns.lineplot(data=out_df, x="Time", y="Activity", hue="Pathway")
-    plt.savefig("m_tcell-qtime-top.png")
-    plt.show()
+#    most = m_significance.iloc[0:10:1].index
+#    m_phenotype_df = m_phenotype_df.append(m_activity_df.loc[most]).T.reset_index()
+#    out_df = pd.melt(m_phenotype_df,id_vars=["Time","index"],value_vars=most, var_name='Pathway', value_name='Activity')
+#    sns.lineplot(data=out_df, x="Time", y="Activity", hue="Pathway")
+#    plt.savefig("m_tcell-qtime-top.png")
+#    plt.show()
 
     print("* Multi-omics analysis ...")
     multiomics_df = pd.concat([proteomics_df,metabolomics_df],axis=0,join="inner")
@@ -224,16 +225,23 @@ The example decompose the individual datasets into pathway activities, and subse
     qv.qvalues(multi_significance,"C(Time)", "q_value_Time")
     multi_significance["-log10(q)"] = -np.log10(multi_significance["q_value_Time"])
     print("The most significant multiomics pathways are:")
-    print(multi_significance.head(n=500))
-    for s in range(0,10,5):
-        most = multi_significance.iloc[s:s+5:1].index
-        multi_joint_df = p_phenotype_df.append(p_activity_df.loc[most]).T.reset_index()
-        out_df = pd.melt(multi_joint_df,id_vars=["Time","index"],value_vars=most, var_name='Pathway', value_name='Activity')
-        sns.lineplot(data=out_df, x="Time", y="Activity", hue="Pathway")
-        plt.savefig("multi_tcell-qtime-{}{}.png".format(s,s+5))
-        plt.show()
+    print(multi_significance.head(n=10))
+    # for s in range(0,10,5):
+    #     most = multi_significance.iloc[s:s+5:1].index
+    #     multi_joint_df = p_phenotype_df.append(p_activity_df.loc[most]).T.reset_index()
+    #     out_df = pd.melt(multi_joint_df,id_vars=["Time","index"],value_vars=most, var_name='Pathway', value_name='Activity')
+    #     sns.lineplot(data=out_df, x="Time", y="Activity", hue="Pathway")
+    #     plt.savefig("multi_tcell-qtime-{}{}.png".format(s,s+5))
+    #     plt.show()
     # sorted_top = {k: v for k, v in sorted(multi_es["R-HSA-202403"].items(), key=lambda item: item[1])}
     # print(sorted_top)
+    multi_significance.index.name = "id"
+
+    conf = sb.get_conf_human()
+    conf["value"] = "q_value_Time"
+    conf['number_genes'] = "set_size"
+    conf['description'] = "annotation"
+    sb.generate_reactome_sunburst(multi_significance, conf)
 
 def main():
     tcell_example()
