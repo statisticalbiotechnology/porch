@@ -9,13 +9,15 @@ import porch.sunburst.run_server as run_server
 import porch.cache as cache
 
 url_to_reactome_relation_file = "https://reactome.org/download/current/ReactomePathwaysRelation.txt"
+
 conf_human = {
     'root_node_id': 'Homo_Sapiens',
     'organism': "HSA",
     'value': "value",
-    'number_genes': "ngenes",
+    'ngenes': "ngenes",
     'description': "descr",
 }
+
 def get_conf_human():
     return conf_human.copy()
 
@@ -30,7 +32,7 @@ def generate_reactome_tree(sb_configuration = get_conf_human()):
     path = os.path.join(cache.get_cache_path(),fn)
     return generate_root_node(cache.download_file(path, url_to_reactome_relation_file), sb_configuration)
 
-def generate_root_node(relation_file, sb_conf = conf_human):
+def generate_root_node(relation_file, sb_conf = get_conf_human()):
 
     rel_df = pd.read_csv(relation_file, sep = "\t", header = None)
 
@@ -116,6 +118,7 @@ def generate_reactome_sunburst_json(stats_df, sb_conf = conf_human):
 
     # in_df = in_df.loc[[x for x in in_df.index if 'HSA' in x]]
 
+    print(stats_df)
     rel_df = generate_reactome_tree(sb_conf)
     topPaths = rel_df.loc[(rel_df['parentId'] == sb_conf["root_node_id"]), 'id']
     rootNgenes = np.sum(stats_df.loc[[x in topPaths.tolist() for x in stats_df.index],sb_conf['ngenes']])

@@ -160,7 +160,7 @@ def porch_multi_reactome(expression_df,list_of_expression_annotations):
             reactome_df = r_df
         else:
             reactome_df.append(r_df)
-    return porch_single_process(expression_df, reactome_df, "gene", "reactome_id")
+    return porch_single_process(expression_df, reactome_df, "gene", "reactome_id", "reactome_name")
 #    return porch(expression_df, reactome_df,
 #        "gene", "reactome_id")
 

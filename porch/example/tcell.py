@@ -237,9 +237,10 @@ The example decompose the individual datasets into pathway activities, and subse
     # print(sorted_top)
     multi_significance.index.name = "id"
 
-    conf = sb.get_conf_human().update({
+    conf = sb.get_conf_human()
+    conf.update({
         'value': "q_value_Time",
-        'number_genes': "set_size",
+        'ngenes': "set_size",
         'description': "annotation" })
 
     sb.generate_reactome_sunburst(multi_significance, conf)
