@@ -10,59 +10,23 @@ from biothings_client import get_client
 from bioservices import KEGG
 import porch
 import porch.qvalue as qv
+<<<<<<< HEAD
 from scipy.stats import norm
+=======
+import porch.cache as cache
+>>>>>>> 7b43937282e50a6308ee7a6aa5e3142ba8eeadc5
 
-cache_directory = ".porch"
+# Directories and file endings for result and temporary files.
 protein_expression_name = "tcell_protein"
 metabolite_expression_name = "tcell_metabolite"
 preprcoc_prefix = "proc_"
 significance_name  = "significance"
 activity_name = "activity"
 
+# URLs to the supplements of
+# Geiger, Roger, et al. "L-arginine modulates T cell metabolism and enhances survival and anti-tumor activity." Cell 167.3 (2016): 829-842.
 proteomics_data_url = "https://ars.els-cdn.com/content/image/1-s2.0-S0092867416313137-mmc1.xlsx"
 metabolomics_data_url = "https://ars.els-cdn.com/content/image/1-s2.0-S0092867416313137-mmc2.xlsx"
-
-class FileCache:
-    def __init__(self, file_name):
-        self.file_name = file_name
-
-    def get_file_name(self):
-        return self.file_name
-
-
-class UrlFileCache(FileCache):
-    def __init__(self, file_name, url):
-        self.file_name = file_name
-        self.url = url
-
-    def track_dl(self):
-        response = requests.get(self.url, stream=True)
-        with open(self.file_name, "wb") as handle:
-            for data in response.iter_content():
-                handle.write(data)
-
-    def get_file_name(self):
-        if not os.path.isfile(self.file_name):
-            self.track_dl()
-        return self.file_name
-
-class TsvFileTracker(FileCache):
-    def __init__(self, file_name, filler):
-        self.file_name = file_name
-        self.filler = filler
-
-    def get_file_name(self):
-        return self.file_name
-
-    def read_file(self):
-        if not os.path.isfile(self.get_file_name()):
-            df = self.filler()
-            self.write_file(df)
-            return df
-        return pd.read_csv(self.get_file_name(), sep="\t", index_col=0)
-
-    def write_file(self,df):
-        df.to_csv(self.file_name, sep="\t")
 
 def one_row_per_proteoform(group):
     # From https://stackoverflow.com/questions/13050003/apply-function-to-pandas-dataframe-that-can-return-multiple-rows
@@ -207,53 +171,65 @@ def tcell_read_proteomics_frames():
     return phenotype_df, proteomics_df
 
 def tcell_example():
+    """
+The examples loads the proteomics and metabolomics data from
+
+>  Geiger, Roger, et al. L-arginine modulates T cell metabolism and enhances survival and anti-tumor activity. Cell 167.3 (2016): 829-842.
+
+The example decompose the individual datasets into pathway activities, and subsequently decompose the joinder of the metabolomics and transcriptomics data
+    """
     print("Downloading data ...")
     p_phenotype_df, proteomics_df = tcell_read_proteomics_frames()
     m_phenotype_df, metabolomics_df = tcell_read_metabolomics_frames()
-    #print(proteomics_df.describe())
-    print(proteomics_df.columns)
-    print(metabolomics_df.columns)
+
     print("Factorize data ...")
     p_activity_df, p_es, untested = porch.porch_reactome(proteomics_df, organism = "HSA", gene_anot = "UniProt")
-    print(p_activity_df)
     m_activity_df, m_es, untested = porch.porch_reactome(metabolomics_df, organism = "HSA", gene_anot = "ChEBI")
-    print(m_activity_df)
+
     print("Significance Testing ...")
     p_significance = porch.linear_model("Pathway ~ C(Time)", p_activity_df, p_phenotype_df)
     m_significance = porch.linear_model("Pathway ~ C(Time)", m_activity_df, m_phenotype_df)
+
     print("Multiple Hypothesis correction ...")
     qv.qvalues(p_significance,"C(Time)", "q_value_Time")
-    print(m_significance)
     qv.qvalues(m_significance,"C(Time)", "q_value_Time")
+
+    print("Plotting the significance of the pathway activity derived from the proteomics data ...")
     fig = plt.figure(figsize=(10,6))
     p_significance["-log10(q)"] = -np.log10(p_significance["q_value_Time"])
     p_significance["z-value"] = norm.ppf(p_significance["C(Time)"])
     g = sns.distplot(p_significance["z-value"], bins=100, rug=True, kde=False)
     plt.savefig("p_tcell-qtime-z.png")
     plt.show()
+
+    print("Plotting the significance of the pathway activity derived from the metabolomics data ...")
     fig = plt.figure(figsize=(10,6))
     m_significance["-log10(q)"] = -np.log10(m_significance["q_value_Time"])
     g = sns.distplot(m_significance["-log10(q)"], rug=True, kde=False)
     plt.savefig("m_tcell-qtime.png")
     plt.show()
+
     p_significance.sort_values(by=['q_value_Time'], inplace=True, ascending=True)
     m_significance.sort_values(by=['q_value_Time'], inplace=True, ascending=True)
     print("The most significant proteomics pathways are:")
     print(p_significance.head(n=10))
     print("The most significant metabolomics pathways are:")
     print(m_significance.head(n=20))
+
     most = p_significance.iloc[0:5:1].index
     p_joint_df = p_phenotype_df.append(p_activity_df.loc[most]).T.reset_index()
     out_df = pd.melt(p_joint_df,id_vars=["Time","index"],value_vars=most, var_name='Pathway', value_name='Activity')
     sns.lineplot(data=out_df, x="Time", y="Activity", hue="Pathway")
     plt.savefig("p_tcell-qtime-top.png")
     plt.show()
+
     most = m_significance.iloc[0:10:1].index
     m_phenotype_df = m_phenotype_df.append(m_activity_df.loc[most]).T.reset_index()
     out_df = pd.melt(m_phenotype_df,id_vars=["Time","index"],value_vars=most, var_name='Pathway', value_name='Activity')
     sns.lineplot(data=out_df, x="Time", y="Activity", hue="Pathway")
     plt.savefig("m_tcell-qtime-top.png")
     plt.show()
+
     print("MultiOmics analysis")
     multiomics_df = pd.concat([proteomics_df,metabolomics_df],axis=0,join="inner")
     multi_phenotype_df = p_phenotype_df[multiomics_df.columns]
