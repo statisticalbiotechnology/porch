@@ -41,10 +41,11 @@ def generate_root_node(relation_file, sb_conf = conf_human):
     G = nx.DiGraph()
     G.add_edges_from(rel_df.values)
     roots = [n for n,d in G.in_degree() if d==0]
+    print(roots)
 
     roots_df = pd.DataFrame(columns = [['parentId', 'id']])
     roots_df['id'] = roots
-    roots_df['parentId'] = root_node_id
+    roots_df['parentId'] = sb_conf["root_node_id"]
 
     roots_df = pd.DataFrame(roots_df.values, columns = ['parentId', 'id'])
     rel_df = pd.DataFrame(rel_df.values, columns = ['parentId', 'id'])
