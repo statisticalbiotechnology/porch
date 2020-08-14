@@ -13,7 +13,7 @@ import patsy
 from lifelines import CoxPHFitter
 from typing import *
 
-import cache
+import porch.cache as cache
 
 def porch_single_process(expression_df: pd.DataFrame,
                                           geneset_df: pd.DataFrame,
@@ -202,9 +202,9 @@ reactome_url = "https://reactome.org/download/current/"
 
 def get_reactome_df(organism = "HSA", gene_anot = "Ensembl"):
     fn = gene_anot + reactome_fn
-    path = os.path.join(cache.cache_path,fn)
+    path = os.path.join(cache.get_cache_path(),fn)
     url = reactome_url + fn
-    reactome_df = pd.read_csv(download_file(path, url),
+    reactome_df = pd.read_csv(cache.download_file(path, url),
                         sep='\t',
                         header=None,
                         usecols=[0,1,3],

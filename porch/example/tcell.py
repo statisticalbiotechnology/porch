@@ -3,18 +3,12 @@ import seaborn as sns
 import scipy.stats
 import numpy as np
 import pandas as pd
-import tarfile
-import requests
 import os
 from biothings_client import get_client
 from bioservices import KEGG
 import porch
 import porch.qvalue as qv
-<<<<<<< HEAD
-from scipy.stats import norm
-=======
 import porch.cache as cache
->>>>>>> 7b43937282e50a6308ee7a6aa5e3142ba8eeadc5
 
 # Directories and file endings for result and temporary files.
 protein_expression_name = "tcell_protein"
@@ -59,7 +53,7 @@ def one_row_per_compound_convert(group, map_kegg_chebi):
 
 def tcell_read_metabolomics_data():
     """This function is quite convoluted as it downloads an excelfile from a publication and extracts a dataframe, idexed by chebi. The function also caches intermediate files"""
-    tcell_metabol_xls = UrlFileCache(os.path.join(cache_directory,  metabolite_expression_name + ".xlsx"), metabolomics_data_url)
+    tcell_metabol_xls = cache.UrlFileCache(os.path.join(cache.get_cache_path(),  metabolite_expression_name + ".xlsx"), metabolomics_data_url)
     metabolomics_df = pd.read_excel(tcell_metabol_xls.get_file_name(), sheet_name = "normalized by sample mean", index_col=0, usecols="A,C:HN", skiprows = [0])
     #metabolomics_df = pd.read_excel(tcell_metabol_xls.get_file_name(), sheet_name = "normalized by sample mean", index_col=0, usecols="A,C:HN", skiprows = [0])
     for col in metabolomics_df.columns:
@@ -77,11 +71,7 @@ def tcell_read_metabolomics_data():
     return metabolomics_df
 
 def tcell_read_metabolomics_frames():
-    try:
-        os.mkdir(cache_directory)
-    except FileExistsError:
-        pass
-    proc_tcell_t = TsvFileTracker(os.path.join(cache_directory, metabolite_expression_name + ".tsv.gz"), tcell_read_metabolomics_data)
+    proc_tcell_t = cache.TsvFileTracker(os.path.join(cache.get_cache_path(), metabolite_expression_name + ".tsv.gz"), tcell_read_metabolomics_data)
     metabolomics_df = proc_tcell_t.read_file()
     values,cols = [],[]
     for coln in metabolomics_df.columns:
@@ -117,7 +107,7 @@ def tcell_read_metabolomics_frames():
 def tcell_read_proteomics_data():
     """This function is quite convoluted as it downloads an excelfile from a publication and extracts a dataframe. The function also caches intermediate files"""
 
-    tcell_prot_xls = UrlFileCache(os.path.join(cache_directory,  protein_expression_name + ".xlsx"),proteomics_data_url)
+    tcell_prot_xls = cache.UrlFileCache(os.path.join(cache.get_cache_path(),  protein_expression_name + ".xlsx"),proteomics_data_url)
     proteomics_df = pd.read_excel(tcell_prot_xls.get_file_name(), sheet_name = "Data", index_col=0, usecols="A,D:U")
 #    proteomics_df = pd.read_excel(tcell_prot_xls.get_file_name(), sheet_name = "Data", index_col=0, usecols="A,V:AM")
     proteomics_df = proteomics_df - proteomics_df.mean()    # Normalize by subtracting column mean
@@ -127,11 +117,7 @@ def tcell_read_proteomics_data():
     return proteomics_df
 
 def tcell_read_proteomics_frames():
-    try:
-        os.mkdir(cache_directory)
-    except FileExistsError:
-        pass
-    proc_tcell_t = TsvFileTracker(os.path.join(cache_directory, protein_expression_name + ".tsv.gz"),tcell_read_proteomics_data)
+    proc_tcell_t = cache.TsvFileTracker(os.path.join(cache.get_cache_path(), protein_expression_name + ".tsv.gz"),tcell_read_proteomics_data)
     proteomics_df = proc_tcell_t.read_file()
     values,cols = [],[]
     for coln in proteomics_df.columns:
@@ -149,7 +135,6 @@ def tcell_read_proteomics_frames():
             time = 96.
         else:
             print(coln)
-        print(coln)
         not_sure = coln.split('_')[0].replace("q","")
         rep = int(coln.split('_')[3].replace(" ",""))
         if rep<18:
@@ -178,31 +163,32 @@ The examples loads the proteomics and metabolomics data from
 
 The example decompose the individual datasets into pathway activities, and subsequently decompose the joinder of the metabolomics and transcriptomics data
     """
-    print("Downloading data ...")
+    print("* Downloading data ...")
+    # These operatios are cached, to reduce re-execution time
     p_phenotype_df, proteomics_df = tcell_read_proteomics_frames()
     m_phenotype_df, metabolomics_df = tcell_read_metabolomics_frames()
 
-    print("Factorize data ...")
+    print("* Factorize data ...")
     p_activity_df, p_es, untested = porch.porch_reactome(proteomics_df, organism = "HSA", gene_anot = "UniProt")
     m_activity_df, m_es, untested = porch.porch_reactome(metabolomics_df, organism = "HSA", gene_anot = "ChEBI")
 
-    print("Significance Testing ...")
+    print("* Significance Testing ...")
     p_significance = porch.linear_model("Pathway ~ C(Time)", p_activity_df, p_phenotype_df)
     m_significance = porch.linear_model("Pathway ~ C(Time)", m_activity_df, m_phenotype_df)
 
-    print("Multiple Hypothesis correction ...")
+    print("* Multiple Hypothesis correction ...")
     qv.qvalues(p_significance,"C(Time)", "q_value_Time")
     qv.qvalues(m_significance,"C(Time)", "q_value_Time")
 
-    print("Plotting the significance of the pathway activity derived from the proteomics data ...")
+    print("* Plotting the significance of the pathway activity derived from the proteomics data ...")
     fig = plt.figure(figsize=(10,6))
     p_significance["-log10(q)"] = -np.log10(p_significance["q_value_Time"])
-    p_significance["z-value"] = norm.ppf(p_significance["C(Time)"])
+    p_significance["z-value"] = scipy.stats.norm.ppf(p_significance["C(Time)"])
     g = sns.distplot(p_significance["z-value"], bins=100, rug=True, kde=False)
     plt.savefig("p_tcell-qtime-z.png")
     plt.show()
 
-    print("Plotting the significance of the pathway activity derived from the metabolomics data ...")
+    print("* Plotting the significance of the pathway activity derived from the metabolomics data ...")
     fig = plt.figure(figsize=(10,6))
     m_significance["-log10(q)"] = -np.log10(m_significance["q_value_Time"])
     g = sns.distplot(m_significance["-log10(q)"], rug=True, kde=False)
@@ -230,7 +216,7 @@ The example decompose the individual datasets into pathway activities, and subse
     plt.savefig("m_tcell-qtime-top.png")
     plt.show()
 
-    print("MultiOmics analysis")
+    print("* Multi-omics analysis ...")
     multiomics_df = pd.concat([proteomics_df,metabolomics_df],axis=0,join="inner")
     multi_phenotype_df = p_phenotype_df[multiomics_df.columns]
     multi_activity_df, multi_es, untested = porch.porch_multi_reactome(multiomics_df,[["HSA","UniProt"], ["HSA","ChEBI"]])
@@ -246,8 +232,8 @@ The example decompose the individual datasets into pathway activities, and subse
         sns.lineplot(data=out_df, x="Time", y="Activity", hue="Pathway")
         plt.savefig("multi_tcell-qtime-{}{}.png".format(s,s+5))
         plt.show()
-    sorted_top = {k: v for k, v in sorted(multi_es["R-HSA-202403"].items(), key=lambda item: item[1])}
-    print(sorted_top)
+    # sorted_top = {k: v for k, v in sorted(multi_es["R-HSA-202403"].items(), key=lambda item: item[1])}
+    # print(sorted_top)
 
 def main():
     tcell_example()

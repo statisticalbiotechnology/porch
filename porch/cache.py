@@ -1,11 +1,21 @@
-import urllib.request
+import pandas as pd
+import tarfile
+import requests
 import os.path
 
 cache_path = ".porch"
 
+def get_cache_path():
+    """ Return a path suitable to store cached files """
+    try:
+        os.mkdir(cache_path)
+    except FileExistsError:
+        pass
+    return cache_path
+
 class FileCache:
     """
-    Object handling file names
+    Object handling file names, mostly an abstract base class
     """
     def __init__(self, file_name):
         self.file_name = file_name
@@ -57,7 +67,8 @@ class TsvFileTracker(FileCache):
 def download_file(path, url):
     "This function downloads a file, path, from an url, if the file is not already cached"
     if not os.path.isfile(path):
-        stream = urllib.request.urlopen(url)
-        with open(path,'wb') as output:
-            output.write(stream.read())
+        response = requests.get(url, stream=True)
+        with open(path, "wb") as handle:
+            for data in response.iter_content():
+                handle.write(data)
     return path
