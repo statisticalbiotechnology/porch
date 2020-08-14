@@ -41,11 +41,10 @@ def generate_root_node(relation_file, sb_conf = conf_human):
     G = nx.DiGraph()
     G.add_edges_from(rel_df.values)
     roots = [n for n,d in G.in_degree() if d==0]
-    print(roots)
 
-    roots_df = pd.DataFrame(columns = [['parentId', 'id']])
+    roots_df = pd.DataFrame(columns = ['parentId', 'id'])
     roots_df['id'] = roots
-    roots_df['parentId'] = sb_conf["root_node_id"]
+    roots_df['parentId'] = sb_conf['root_node_id']
 
     roots_df = pd.DataFrame(roots_df.values, columns = ['parentId', 'id'])
     rel_df = pd.DataFrame(rel_df.values, columns = ['parentId', 'id'])
@@ -68,7 +67,7 @@ def generate_sunburst_json(stats_df, relation_file, root_node_id = 'Homo_Sapiens
 
     rel_df = generate_root_node(relation_file, root_node_id = root_node_id)
     topPaths = rel_df.loc[(rel_df['parentId'] == root_node_id), 'id']
-    rootNgenes = np.sum(in_df.loc[[x in topPaths.tolist() for x in in_df.index],'ngenes'])
+    rootNgenes = np.sum(stats_df.loc[[x in topPaths.tolist() for x in stats_df.index],'ngenes'])
     rootNode = pd.DataFrame([[1,rootNgenes,"Homo Sapiens", 0,0,0,0]], columns = ["value", "ngenes", "descr"]).xs(0)
     rootNode.name = root_node_id
 
@@ -119,7 +118,7 @@ def generate_reactome_sunburst_json(stats_df, sb_conf = conf_human):
 
     rel_df = generate_reactome_tree(sb_conf)
     topPaths = rel_df.loc[(rel_df['parentId'] == sb_conf["root_node_id"]), 'id']
-    rootNgenes = np.sum(in_df.loc[[x in topPaths.tolist() for x in in_df.index],sb_conf['ngenes']])
+    rootNgenes = np.sum(stats_df.loc[[x in topPaths.tolist() for x in stats_df.index],sb_conf['ngenes']])
     rootNode = pd.DataFrame([[1, rootNgenes, sb_conf['root_node_id'], 0, 0, 0, 0]], columns = [sb_conf["value"], sb_conf["ngenes"], sb_conf["descr"]]).xs(0)
     rootNode.name = sb_conf['root_node_id']
 
