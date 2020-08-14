@@ -18,9 +18,11 @@ setup(
         "scikit-learn",
         "requests",
         "biothings_client",
+        "bioservices",
         "seaborn",
         "scipy",
         "wpca",
+        "xlrd",
         "lifelines>=0.24",
     ],
 )

@@ -102,15 +102,17 @@ def porch_proc(setname, genes, expression_df,keep_feature_stdv=True):
     expr.dropna(axis=0, how='any', inplace=True)
     expr = expr.loc[~(expr<=0.0).any(axis=1)]
     if expr.shape[0]>2:
-        standardizer = StandardScaler(with_std=keep_feature_stdv)
-        log_data = np.log(expr.values.T.astype(float))
-        standard_log_data = standardizer.fit_transform(log_data).T
-        eigen_genes, eigen_samples = decomposition_method(standard_log_data)
-        eigen_sample_dict = dict(zip(expr.index,eigen_samples))
-        return setname, eigen_genes, eigen_sample_dict
-    else:
-#        print("Not enough data to evaluate " + setname, file=sys.stderr)
-        return setname, None, None
+        try:
+            standardizer = StandardScaler(with_std=keep_feature_stdv)
+            log_data = np.log(expr.values.T.astype(float))
+            standard_log_data = standardizer.fit_transform(log_data).T
+            eigen_genes, eigen_samples = decomposition_method(standard_log_data)
+            eigen_sample_dict = dict(zip(expr.index,eigen_samples))
+            return setname, eigen_genes, eigen_sample_dict
+        except ValueError:
+            pass
+#   print("Not enough data to evaluate " + setname, file=sys.stderr)
+    return setname, None, None
 
 def porch_reactome(expression_df: pd.DataFrame,
                                  organism: str = "HSA",

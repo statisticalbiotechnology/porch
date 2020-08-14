@@ -10,6 +10,7 @@ from biothings_client import get_client
 from bioservices import KEGG
 import porch
 import porch.qvalue as qv
+from scipy.stats import norm
 
 cache_directory = ".porch"
 protein_expression_name = "tcell_protein"
@@ -226,8 +227,9 @@ def tcell_example():
     qv.qvalues(m_significance,"C(Time)", "q_value_Time")
     fig = plt.figure(figsize=(10,6))
     p_significance["-log10(q)"] = -np.log10(p_significance["q_value_Time"])
-    g = sns.distplot(p_significance["-log10(q)"], rug=True, kde=False)
-    plt.savefig("p_tcell-qtime.png")
+    p_significance["z-value"] = norm.ppf(p_significance["C(Time)"])
+    g = sns.distplot(p_significance["z-value"], bins=100, rug=True, kde=False)
+    plt.savefig("p_tcell-qtime-z.png")
     plt.show()
     fig = plt.figure(figsize=(10,6))
     m_significance["-log10(q)"] = -np.log10(m_significance["q_value_Time"])
