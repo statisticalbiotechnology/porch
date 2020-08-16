@@ -134,7 +134,7 @@ def porch_reactome(expression_df: pd.DataFrame,
                                  organism: str = "HSA",
                                  gene_anot: str = "Ensembl") -> Tuple[pd.DataFrame, List]:
     """
-    Download the Reactome database and subsequently call porch
+    Download the Reactome database and subsequently call porch.
 
     Args:
         expression_df (pd.DataFrame): The DataFrame of the expression values we analyse. These values are logtransformed and subsequently standardized befor analysis
@@ -152,7 +152,7 @@ def porch_reactome(expression_df: pd.DataFrame,
         "gene", "reactome_id", "reactome_name")
 
 def porch_multi_reactome(expression_df,list_of_expression_annotations):
-    "Download the Reactome database and subsequently call porch"
+    """ Download the Reactome database and subsequently call porch. """
     reactome_df = None
     for organism, gene_anot in list_of_expression_annotations:
         r_df = get_reactome_df(organism, gene_anot)
@@ -202,6 +202,7 @@ def linear_model(test,activity_df,phenotype_df):
         axis=1, result_type='reduce',
         args=(test,phenotype_df))
     significance_df["annotation"] = activity_df["annotation"]
+    significance_df["set_size"] = activity_df["set_size"]
     return significance_df
 
 def applicable_linear_model(row,test,phenotype_df):

@@ -60,7 +60,7 @@ def generate_sunburst_json(stats_df, relation_file, root_node_id = 'Homo_Sapiens
     indexes  should be the pathway IDs
     'value' will be translated to colors in the plot.
     'ngenes' is the size of the pathwat, and will be displayed as the size of each arc.
-    'descr' as the description of the pathway
+    'description' as the description of the pathway
 
     relation_file is downloaded from Reactome "ReactomePathwaysRelation.txt"
     '''
@@ -70,7 +70,7 @@ def generate_sunburst_json(stats_df, relation_file, root_node_id = 'Homo_Sapiens
     rel_df = generate_root_node(relation_file, root_node_id = root_node_id)
     topPaths = rel_df.loc[(rel_df['parentId'] == root_node_id), 'id']
     rootNgenes = np.sum(stats_df.loc[[x in topPaths.tolist() for x in stats_df.index],'ngenes'])
-    rootNode = pd.DataFrame([[1,rootNgenes,"Homo Sapiens", 0,0,0,0]], columns = ["value", "ngenes", "descr"]).xs(0)
+    rootNode = pd.DataFrame([[1,rootNgenes,"Homo Sapiens", 0,0,0,0]], columns = ["value", "ngenes", "description"]).xs(0)
     rootNode.name = root_node_id
 
     stats_df = stats_df.append(rootNode)
@@ -91,38 +91,37 @@ def generate_sunburst_json(stats_df, relation_file, root_node_id = 'Homo_Sapiens
 
     secondDict = nx.get_node_attributes(tree,'source')
 
-    thirdDict = {'value':{}, 'ngenes':{}, 'descr':{}}
+    thirdDict = {'value':{}, 'ngenes':{}, 'description':{}}
     for key, value in secondDict.items():
         thirdDict['value'].update({key : topDict['value'][value]})
         thirdDict['ngenes'].update({key : topDict['ngenes'][value]})
-        thirdDict['descr'].update({key : topDict['descr'][value]})
+        thirdDict['description'].update({key : topDict['description'][value]})
 
 
     nx.set_node_attributes(tree, thirdDict['value'], name = 'value')
     nx.set_node_attributes(tree, thirdDict['ngenes'], name = 'ngenes')
-    nx.set_node_attributes(tree, thirdDict['descr'], name = 'descr')
+    nx.set_node_attributes(tree, thirdDict['description'], name = 'description')
 
     root = [v for v, d in tree.in_degree() if d == 0][0]
     out_json = json_graph.tree_data(tree, root)
 
     return out_json
 
-def generate_reactome_sunburst_json(stats_df, sb_conf = conf_human):
-    '''
+def generate_reactome_sunburst_json(stats_df, sb_conf = get_conf_human()):
+    """
     stats_df has a very specific format:
     indexes  should be the pathway IDs
     'value' will be translated to colors in the plot.
     'ngenes' is the size of the pathwat, and will be displayed as the size of each arc.
-    'descr' as the description of the pathway
-    '''
-
+    'description' as the description of the pathway
+    """
     # in_df = in_df.loc[[x for x in in_df.index if 'HSA' in x]]
 
-    print(stats_df)
+    print(sb_conf)
     rel_df = generate_reactome_tree(sb_conf)
     topPaths = rel_df.loc[(rel_df['parentId'] == sb_conf["root_node_id"]), 'id']
     rootNgenes = np.sum(stats_df.loc[[x in topPaths.tolist() for x in stats_df.index],sb_conf['ngenes']])
-    rootNode = pd.DataFrame([[1, rootNgenes, sb_conf['root_node_id'], 0, 0, 0, 0]], columns = [sb_conf["value"], sb_conf["ngenes"], sb_conf["descr"]]).xs(0)
+    rootNode = pd.DataFrame([[1, rootNgenes, sb_conf['root_node_id'], 0, 0, 0, 0]], columns = [sb_conf["value"], sb_conf["ngenes"], sb_conf["description"]]).xs(0)
     rootNode.name = sb_conf['root_node_id']
 
     stats_df = stats_df.append(rootNode)
@@ -143,16 +142,16 @@ def generate_reactome_sunburst_json(stats_df, sb_conf = conf_human):
 
     secondDict = nx.get_node_attributes(tree,'source')
 
-    thirdDict = {'value':{}, 'ngenes':{}, 'descr':{}}
+    thirdDict = {'value':{}, 'ngenes':{}, 'description':{}}
     for key, value in secondDict.items():
         thirdDict[sb_conf['value']].update({key : topDict[sb_conf['value']][value]})
         thirdDict[sb_conf['ngenes']].update({key : topDict[sb_conf['ngenes']][value]})
-        thirdDict[sb_conf['descr']].update({key : topDict[sb_conf['descr']][value]})
+        thirdDict[sb_conf['description']].update({key : topDict[sb_conf['description']][value]})
 
 
     nx.set_node_attributes(tree, thirdDict[sb_conf['value']], name = 'value')
     nx.set_node_attributes(tree, thirdDict[sb_conf['ngenes']], name = 'ngenes')
-    nx.set_node_attributes(tree, thirdDict[sb_conf['descr']], name = 'descr')
+    nx.set_node_attributes(tree, thirdDict[sb_conf['description']], name = 'description')
 
     root = [v for v, d in tree.in_degree() if d == 0][0]
     out_json = json_graph.tree_data(tree, root)
@@ -163,10 +162,10 @@ def generate_reactome_sunburst_json(stats_df, sb_conf = conf_human):
 
 def prepare_tree_df(in_df, rectome_df):
     ngenes = reactome_df.groupby('reactome_id').count()['gene']
-    descr = rectome_df.groupby('reactome_id').first()['reactome_name']
+    description = rectome_df.groupby('reactome_id').first()['reactome_name']
     in_df['ngenes'] = ngenes
-    in_df['descr'] = descr
-    in_df.columns = ['value','ngenes','descr']
+    in_df['description'] = description
+    in_df.columns = ['value','ngenes','description']
     return in_df
 
 def default(o):
