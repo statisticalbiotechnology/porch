@@ -235,10 +235,10 @@ The example decompose the individual datasets into pathway activities, and subse
     #     plt.show()
     # sorted_top = {k: v for k, v in sorted(multi_es["R-HSA-202403"].items(), key=lambda item: item[1])}
     # print(sorted_top)
-    
+
     conf = sb.get_conf_human()
     conf.update({
-        'value': "q_value_Time",
+        'value': "-log10(q)",
         'ngenes': "set_size",
         'description': "annotation" })
 

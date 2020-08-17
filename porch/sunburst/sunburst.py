@@ -5,6 +5,8 @@ from networkx.readwrite import json_graph
 from urllib.parse import urlparse
 import os.path
 import json
+import inspect
+import shutil
 import porch.sunburst.run_server as run_server
 import porch.cache as cache
 
@@ -183,6 +185,10 @@ def generate_sunburst(values_df, reactome_df, relation_file, filename, root_node
     run_server.run_sunburst(path='.')
 
 def generate_reactome_sunburst(values_df, sb_configuration = conf_human):
+    base = cache.get_cache_path()
     json = generate_reactome_sunburst_json(values_df, sb_configuration)
-    write_json(json, 'results.json')
-    run_server.run_sunburst(path='.')
+    write_json(json, os.path.join(base, 'results.json'))
+    resource_path = os.path.dirname(inspect.getsourcefile(run_server))
+    shutil.copy(os.path.join(resource_path,"index.html"), base)
+    shutil.copy(os.path.join(resource_path,"breadcrumb.js"), base)
+    run_server.run_sunburst(path=base)

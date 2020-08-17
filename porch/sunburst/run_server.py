@@ -2,6 +2,7 @@ import http.server
 import socketserver
 from threading import Timer
 import webbrowser
+
 """
 This script finds the first open port between 8000 and 8100
 and starts a http server and then opens a new browser tab with localhost
