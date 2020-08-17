@@ -117,11 +117,10 @@ def generate_reactome_sunburst_json(stats_df, sb_conf = get_conf_human()):
     """
     # in_df = in_df.loc[[x for x in in_df.index if 'HSA' in x]]
 
-    print(sb_conf)
     rel_df = generate_reactome_tree(sb_conf)
     topPaths = rel_df.loc[(rel_df['parentId'] == sb_conf["root_node_id"]), 'id']
     rootNgenes = np.sum(stats_df.loc[[x in topPaths.tolist() for x in stats_df.index],sb_conf['ngenes']])
-    rootNode = pd.DataFrame([[1, rootNgenes, sb_conf['root_node_id'], 0, 0, 0, 0]], columns = [sb_conf["value"], sb_conf["ngenes"], sb_conf["description"]]).xs(0)
+    rootNode = pd.DataFrame([[1, rootNgenes, sb_conf['root_node_id']]], columns = [sb_conf["value"], sb_conf["ngenes"], sb_conf["description"]]).xs(0)
     rootNode.name = sb_conf['root_node_id']
 
     stats_df = stats_df.append(rootNode)
@@ -142,7 +141,7 @@ def generate_reactome_sunburst_json(stats_df, sb_conf = get_conf_human()):
 
     secondDict = nx.get_node_attributes(tree,'source')
 
-    thirdDict = {'value':{}, 'ngenes':{}, 'description':{}}
+    thirdDict = {sb_conf['value']:{}, sb_conf['ngenes']:{}, sb_conf['description']:{}}
     for key, value in secondDict.items():
         thirdDict[sb_conf['value']].update({key : topDict[sb_conf['value']][value]})
         thirdDict[sb_conf['ngenes']].update({key : topDict[sb_conf['ngenes']][value]})
@@ -155,6 +154,7 @@ def generate_reactome_sunburst_json(stats_df, sb_conf = get_conf_human()):
 
     root = [v for v, d in tree.in_degree() if d == 0][0]
     out_json = json_graph.tree_data(tree, root)
+    print(out_json)
 
     return out_json
 
@@ -172,9 +172,9 @@ def default(o):
      if isinstance(o, np.integer): return int(o)
      raise TypeError
 
-def write_json(json, file_name):
+def write_json(json_in, file_name):
     with open(file_name, 'w') as outfile:
-        json.dump(json, outfile, default=default)
+        json.dump(json_in, outfile, default=default)
 
 def generate_sunburst(values_df, reactome_df, relation_file, filename, root_node_id = 'Homo_Sapiens'):
     # relation_file is downloaded from Reactome "ReactomePathwaysRelation.txt"
@@ -185,5 +185,5 @@ def generate_sunburst(values_df, reactome_df, relation_file, filename, root_node
 
 def generate_reactome_sunburst(values_df, sb_configuration = conf_human):
     json = generate_reactome_sunburst_json(values_df, sb_configuration)
-    write_json(json, filename)
+    write_json(json, 'results.json')
     run_server.run_sunburst(path='.')
