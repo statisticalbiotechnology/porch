@@ -58,7 +58,7 @@ path {
 
 
 var margin = {top: 20, right: 20, bottom: 20, left: 20}
-		, width = window.innerWidth - margin.left - margin.right // Use the window's width 
+		, width = window.innerWidth - margin.left - margin.right // Use the window's width
 		, height = window.innerHeight - margin.top - margin.bottom; // Use the window's height
 
 var radius = (Math.min(width, height) / 2) - 10;
@@ -102,7 +102,7 @@ var svg = d3.select("body").append("svg")
 
 
 var breadcrumb = d3.breadcrumb()
-		.container('svg').wrapWidth(width * 2/3)   // any element or selection 
+		.container('svg').wrapWidth(width * 2/3)   // any element or selection
 
 var legendLength = radius*2
 
@@ -123,7 +123,7 @@ function draw() {
 				root.each(d => valsLeg.push(d.data.value)  )
 
 				legendMinVal = d3.min(valsLeg)
-				legendMaxVal = d3.max(valsLeg) 
+				legendMaxVal = d3.max(valsLeg)
 
 				transitionValue = d3.select('#transitionValue').property('value')
 
@@ -136,7 +136,7 @@ function draw() {
 						.range([legendMinVal, legendMaxVal])
 
 				legendData = Array.apply(null, {length: legendLength}).map(Number.call, Number).map(function(x) { return legScale(x/legendLength) })
-				
+
 				<!-- root.each(d=> d.value = +d.data.ngenes); -->
 
 				<!-- root.sum(function(d) { return d.children ? 0 : 1; }); -->
@@ -196,7 +196,7 @@ function draw() {
 
 
 function click(d) {
-		
+
 		svg.selectAll(".axis").remove();
 		svg.selectAll(".grid").remove();
 
@@ -213,7 +213,7 @@ function click(d) {
 				.attrTween("d", function(d) { return function() { return arc(d); }; });
 
 		var sequenceArray = d.ancestors().reverse();
-		sequenceArray.forEach(function(a) { a.text = a.data.descr; a.fill = "#cce0cc";  })
+		sequenceArray.forEach(function(a) { a.text = a.data.description; a.fill = "#cce0cc";  })
 		breadcrumb.show(sequenceArray);
 
 }
@@ -222,9 +222,9 @@ function mouseover(d) {
 
 		d3.select("#tooltip")
 				.style("left", d3.event.pageX + "px")
-				.style("top", d3.event.pageY + "px")						
+				.style("top", d3.event.pageY + "px")
 				.style("opacity", .9)
-				.html(d.data.source + "</br>" + d.data.descr + "</br>" + formatNumber(d.data.ngenes) + " genes </br>value = " + d.data.value);
+				.html(d.data.source + "</br>" + d.data.description + "</br>" + formatNumber(d.data.ngenes) + " genes </br>value = " + d.data.value);
 
 		d3.select("#tooltip").classed("hidden", false);
 }
@@ -236,13 +236,13 @@ function mouseout(d) {
 
 
 // gridlines in x axis function
-function make_x_gridlines() {		
+function make_x_gridlines() {
     return d3.axisBottom(xScale)
         .ticks(10)
 }
 
 // gridlines in y axis function
-function make_y_gridlines() {		
+function make_y_gridlines() {
     return d3.axisLeft(yScale)
         .ticks(10)
 }
