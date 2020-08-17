@@ -154,7 +154,6 @@ def generate_reactome_sunburst_json(stats_df, sb_conf = get_conf_human()):
 
     root = [v for v, d in tree.in_degree() if d == 0][0]
     out_json = json_graph.tree_data(tree, root)
-    print(out_json)
 
     return out_json
 
