@@ -255,7 +255,6 @@ def survival(row, phenotype_df, duration_col = 'T', event_col = 'E', other_cols 
     event_col: whether an event (death or other) has ocured or not. 0 for no, 1 for yes
     other_cols: other variables to consider in the regression
     """
-    phenotype_df = phenotype_df.T
     phenotype_df = phenotype_df.join(row.astype(float))
     phenotype_df[duration_col] = phenotype_df[duration_col].astype(float)
     phenotype_df[event_col] = phenotype_df[event_col].astype(int)
