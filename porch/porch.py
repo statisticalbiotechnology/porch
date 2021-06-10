@@ -56,7 +56,6 @@ def porch_single_process(expression_df: pd.DataFrame,
             set_sizes += [set_size]
             activities += [activity]
             eigen_samples[setname] = eigen_sample_dict
-
     activity_df = pd.DataFrame(data=activities, columns=expression_df.columns, index=setnames)
     activity_df["annotation"] = set_annots
     activity_df["set_size"] = set_sizes
@@ -147,9 +146,8 @@ def porch_reactome(expression_df: pd.DataFrame,
             - **untested** (*list*): a list of the pathway that were not possible to decompose, due to shortage of data in expression_df.
     """
     reactome_df = get_reactome_df(organism, gene_anot)
-#    return porch_single_process(expression_df, reactome_df, "gene", "reactome_id")
-    return porch(expression_df, reactome_df,
-        "gene", "reactome_id", "reactome_name")
+#    return porch_single_process(expression_df, reactome_df, "gene", "reactome_id", "reactome_name")
+    return porch(expression_df, reactome_df, "gene", "reactome_id", "reactome_name")
 
 def porch_multi_reactome(expression_df,list_of_expression_annotations):
     """ Download the Reactome database and subsequently call porch. """

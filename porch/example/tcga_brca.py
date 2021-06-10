@@ -11,7 +11,7 @@ import porch
 import porch.qvalue as qv
 
 cache_directory = ".porch"
-expression_name = "brca"
+expression_matrix_name = "brca"
 phenotype_name = "brca_clin"
 preprcoc_prefix = "proc_"
 significance_name  = "significance"
@@ -38,7 +38,7 @@ def get_ensembl_ids(entrez_ids):
             drop_list.append(query)
     return translate, drop_list
 
-def tcga_preprocess(brca, brca_clin):
+def tcga_tn_preprocess(brca, brca_clin):
     brca.dropna(axis=0, how='any', inplace=True)
     brca = brca.loc[~(brca<=0.0).any(axis=1)].copy()
     entrez2ensembl, drop_list = get_ensembl_ids(list(brca.index))
@@ -68,7 +68,7 @@ def tcga_read_data():
     except FileExistsError:
         pass
     
-    brca_path= os.path.join(cache_directory,  expression_name + ".tsv.gz")
+    brca_path= os.path.join(cache_directory,  expression_matrix_name + ".tsv.gz")
     brca_clin_path = os.path.join(cache_directory,  phenotype_name + ".tsv.gz")
     try:
         brca = pd.read_csv(brca_path, sep="\t",index_col=0)
@@ -84,7 +84,6 @@ def tcga_read_data():
 
     # Decompress data into tables
     tf = tarfile.open(tcga_path)
-    print(tf.getmembers())
     tf.extract(expression_name, cache_directory)
     tf.extract(clinical_name, cache_directory)
 
@@ -106,54 +105,17 @@ def tcga_read_data():
     df.drop(index=["Unnamed: 0","#Patient Identifier","Sample Identifier","Other Sample ID"], inplace=True,errors='ignore')
     brca_clin = df.reindex(sorted(df.columns), axis=1)
 
-    # def tcga_preprocess(brca, brca_clin):
-    brca.dropna(axis=0, how='any', inplace=True)
-    brca = brca.loc[~(brca<=0.0).any(axis=1)].copy()
-    entrez2ensembl, drop_list = get_ensembl_ids(list(brca.index))
-    # Convert all genenames we can, drop the rest
-    brca.drop(index=drop_list, inplace=True)
-    brca.rename(index=entrez2ensembl, inplace=True)
-    #brca.index =  brca.index.map(str)
-    #brca = pd.DataFrame(data=np.log2(brca.values), index=brca.index, columns=brca.columns)
-    brca_clin = brca_clin.loc[["PR status by ihc","ER Status By IHC","IHC-HER2"]].rename(index={"PR status by ihc" : "PR","ER Status By IHC":"ER","IHC-HER2":"HER2"})
-    relevant_col = brca_clin.T["PR"].isin(['Negative', 'Positive']) & brca_clin.T["ER"].isin(['Negative', 'Positive']) & brca_clin.T["HER2"].isin(['Negative', 'Positive'])
-    brca_clin = brca_clin.T[relevant_col].T
-    brca = brca.T[relevant_col].T
-    # mapping = {'Negative': 0, 'Positive': 1, '[Not Available]': 1, 'Equivocal' : 1, 'Indeterminate' : 1}
-    mapping = {'Negative': 0, 'Positive': 1}
-    brca_clin.replace(mapping, inplace=True)
+    brca_clin, brca_clin = tcga_tn_preprocess(brca, brca_clin)
+
     # Put the extracted matrixes to the file cashe, so we do not have to do this again if procedure is repeated.
     brca.to_csv(brca_path, sep="\t")
     brca_clin.to_csv(brca_clin_path, sep="\t")
     return brca, brca_clin
 
-def tcga_read_data_old():
-    """This function is quite convoluted as it downloads one tarfile and extracts two dataframes. The function also caches intermediate files"""
-    print("Downloading data ...")
-    try:
-        os.mkdir(cache_directory)
-    except FileExistsError:
-        pass
-
-    brca_path= os.path.join(cache_directory,  expression_name + ".tsv.gz")
-    brca_clin_path = os.path.join(cache_directory,  phenotype_name + ".tsv.gz")
-    proc_brca_t = FileTracker(os.path.join(cache_directory,  preprcoc_prefix + expression_name + ".tsv.gz"))
-    proc_brca_clin_t = FileTracker(os.path.join(cache_directory,  preprcoc_prefix + phenotype_name + ".tsv.gz"))
-    tcga = TcgaTracker('https://cbioportal-datahub.s3.amazonaws.com/brca_tcga_pub2015.tar.gz', cache_directory, "my.tar.gz")
-    try:
-        brca = proc_brca_t.read_file()
-        brca_clin = proc_brca_clin_t.read_file()
-    except Exception:
-        brca = tcga.get_expression_data(brca_path,"data_RNA_Seq_v2_expression_median.txt")
-        brca_clin = tcga.get_clinical_data(brca_clin_path,"data_clinical_sample.txt")
-        print("Preprocessing data ...")
-        brca, brca_clin = tcga_preprocess(brca, brca_clin)
-        proc_brca_t.write_file(brca)
-        proc_brca_clin_t.write_file(brca_clin)
-    return brca, brca_clin
 
 def tcga_example():
     brca, brca_clin = tcga_read_data()
+    print(brca_clin) 
     print("Run Porch ...")
     activity, eigen_samples, untested = porch.porch_reactome(brca)
     significance = porch.linear_model("Pathway ~ C(PR) + C(ER) + C(PR):C(ER)", activity, brca_clin)
@@ -163,7 +125,6 @@ def tcga_example():
     runx1 = activity.loc["R-HSA-8931987",:].T
     runx1 = runx1.drop(["annotation", "set_size"]).to_numpy()
 
-    print(runx1)
     hist, bin_edges = np.histogram(runx1,40)
     fig = plt.figure(figsize=(10,6))
     sns.distplot(runx1[tripple_neg], bins=bin_edges, kde=False,norm_hist=True, color="red")
